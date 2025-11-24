@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Create Availability{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <div class="card-section">
+      <h1 style="margin-top: 0;">Create Availability Schedule</h1>
+      
+      <form method="post">
+        {% csrf_token %}
+        
+        {% for field in form %}
+          <label class="form-label">{{ field.label }}</label>
+          {{ field }}
+          {% if field.errors %}
+            <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ field.errors }}</div>
+          {% endif %}
+        {% endfor %}
+        
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
+          <button type="submit" class="btn btn-primary">Create Availability</button>
+          <a href="{% url 'booking_sys:calendar' %}" class="btn btn-outline">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}
+

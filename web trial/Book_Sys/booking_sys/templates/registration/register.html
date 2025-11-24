@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Register{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div style="max-width: 500px; margin: 2rem auto;">
+    <div class="card-section">
+      <h1 style="margin-top: 0;">Create Account</h1>
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Join UniBook to start booking facilities today!</p>
+
+      <form method="post" action="{% url 'booking_sys:register' %}">
+        {% csrf_token %}
+        
+        <label class="form-label">Username</label>
+        {{ form.username }}
+        {% if form.username.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.username.errors }}</div>
+        {% endif %}
+        
+        <label class="form-label">Email</label>
+        {{ form.email }}
+        {% if form.email.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.email.errors }}</div>
+        {% endif %}
+        
+        <label class="form-label">First Name</label>
+        {{ form.first_name }}
+        {% if form.first_name.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.first_name.errors }}</div>
+        {% endif %}
+        
+        <label class="form-label">Last Name</label>
+        {{ form.last_name }}
+        {% if form.last_name.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.last_name.errors }}</div>
+        {% endif %}
+        
+        <label class="form-label">Member Type</label>
+        {{ form.member_type }}
+        {% if form.member_type.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.member_type.errors }}</div>
+        {% endif %}
+        
+        <label class="form-label">Phone Number (Optional)</label>
+        {{ form.user_phone }}
+        {% if form.user_phone.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.user_phone.errors }}</div>
+        {% endif %}
+        
+        {% if form.member_type.value == 'student' %}
+          <label class="form-label">Student ID</label>
+          <input type="text" name="student_id" class="form-control" placeholder="Enter your student ID">
+        {% elif form.member_type.value == 'staff' %}
+          <label class="form-label">Department</label>
+          <input type="text" name="department" class="form-control" placeholder="Enter your department">
+        {% endif %}
+        
+        <label class="form-label">Password</label>
+        {{ form.password1 }}
+        {% if form.password1.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.password1.errors }}</div>
+        {% endif %}
+        
+        <label class="form-label">Confirm Password</label>
+        {{ form.password2 }}
+        {% if form.password2.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.password2.errors }}</div>
+        {% endif %}
+        
+        {% if form.non_field_errors %}
+          <div style="margin-top: 1rem; padding: 0.75rem; background: #fee2e2; color: #b91c1c; border-radius: 8px; font-size: 0.9rem;">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+        
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">Create Account</button>
+      </form>
+
+      <p style="text-align: center; margin-top: 1.5rem; color: var(--text-muted);">
+        Already have an account? <a href="{% url 'booking_sys:login' %}" style="color: var(--primary);">Sign in here</a>
+      </p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+

@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Calendar{% endblock %}
+
+{% block content %}
+<section class="section calendar-layout">
+  <div class="calendar-main">
+    <div class="section-header">
+      <h1>Events Calendar</h1>
+      <p>Tap a day to highlight facility bookings, tournaments and closures.</p>
+    </div>
+
+    <!-- Interactive day picker -->
+    <form method="get" class="calendar-day-picker">
+      <div class="day-pill-grid">
+        {% for day in calendar_days %}
+          <button type="submit"
+                  name="day"
+                  value="{{ day.index }}"
+                  class="day-pill {% if day.is_selected %}active{% endif %}">
+            <span class="day-name">{{ day.name|slice:":3" }}</span>
+            <span class="day-count">{{ day.count }} events</span>
+          </button>
+        {% endfor %}
+      </div>
+    </form>
+
+    {% include 'components/calendar_template.html' %}
+
+    <div class="selected-day-card">
+      <div class="selected-day-header">
+        <h2>{{ selected_day_entry.name }} timeline</h2>
+        <p>{{ selected_day_bookings|length }} scheduled event{{ selected_day_bookings|pluralize }}</p>
+      </div>
+
+      {% if selected_day_bookings %}
+        <ul class="events-list">
+          {% for booking in selected_day_bookings %}
+            <li>
+              <h3>{{ booking.slot.court.court_name }} · {{ booking.slot.court.facility.facility_name }}</h3>
+              <p>{{ booking.slot.start_time|time:"g:i A" }} – {{ booking.slot.end_time|time:"g:i A" }}</p>
+              <a href="{% url 'booking_sys:facility_detail' booking.slot.court.facility.facility_name|slugify %}" class="link-small">View facility</a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p style="color: var(--text-muted);">No events for this day. Pick another day or create a booking.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <aside class="calendar-sidebar">
+    <div class="booking-card">
+      <h2>Upcoming Events</h2>
+      {% if upcoming_bookings %}
+        <ul class="events-list">
+          {% for booking in upcoming_bookings|slice:":5" %}
+            <li>
+              <h3>{{ booking.slot.court.court_name }}</h3>
+              <p>{{ booking.slot.court.facility.facility_name }} · {{ booking.slot.start_time|time:"g:i A" }}</p>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p style="color: var(--text-muted); font-size: 0.9rem;">No upcoming bookings scheduled.</p>
+      {% endif %}
+
+      <h2>My Next Bookings</h2>
+      {% if user.is_authenticated %}
+        {% if user_bookings %}
+          <ul class="events-list">
+            {% for booking in user_bookings %}
+              <li>
+                <h3>{{ booking.slot.court.court_name }}</h3>
+                <p>{{ booking.booking_date_time|date:"M d" }} · {{ booking.slot.start_time|time:"g:i A" }} – {{ booking.slot.end_time|time:"g:i A" }}</p>
+                <a href="{% url 'booking_sys:facility_detail' booking.slot.court.facility.facility_name|slugify %}" class="link-small">View booking</a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p style="color: var(--text-muted); font-size: 0.9rem;">No upcoming bookings. <a href="{% url 'booking_sys:facilities' %}" class="link-small">Book a facility</a></p>
+        {% endif %}
+      {% else %}
+        <p style="color: var(--text-muted); font-size: 0.9rem;"><a href="{% url 'booking_sys:login' %}" class="link-small">Sign in</a> to see your bookings.</p>
+      {% endif %}
+    </div>
+  </aside>
+</section>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .calendar-day-picker {
+    margin-bottom: 1rem;
+  }
+  .day-pill-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 0.5rem;
+  }
+  .day-pill {
+    border: 1px solid var(--border-subtle);
+    border-radius: 18px;
+    padding: 0.6rem;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .day-pill .day-name {
+    font-weight: 600;
+  }
+  .day-pill .day-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .day-pill:hover {
+    border-color: var(--primary);
+  }
+  .day-pill.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .day-pill.active .day-count {
+    color: #e0f2f1;
+  }
+  .selected-day-card {
+    margin-top: 1.5rem;
+    background: var(--surface);
+    border-radius: 18px;
+    box-shadow: var(--shadow-soft);
+    padding: 1.25rem 1.4rem;
+  }
+  .selected-day-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .selected-day-header h2 {
+    margin: 0;
+  }
+  .selected-day-header p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .visual-calendar {
+    margin-bottom: 1.5rem;
+    background: var(--surface);
+    border-radius: 18px;
+    box-shadow: var(--shadow-soft);
+    padding: 1.2rem 1.4rem;
+  }
+  .visual-calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+  .visual-calendar-header h3 {
+    margin: 0;
+  }
+  .calendar-label {
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .visual-calendar-grid {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .visual-calendar-grid th,
+  .visual-calendar-grid td {
+    text-align: center;
+    padding: 0.6rem 0;
+    border: 1px solid var(--border-subtle);
+    font-size: 0.9rem;
+  }
+  .visual-calendar-grid th {
+    background: #f3f4f6;
+    font-weight: 600;
+  }
+  .visual-calendar-grid td.today {
+    background: #ecfdf5;
+    border: 2px solid #059669;
+  }
+  .visual-calendar-grid td.has-event::after {
+    content: "";
+    display: block;
+    width: 6px;
+    height: 6px;
+    margin: 4px auto 0;
+    border-radius: 999px;
+    background: #10b981;
+  }
+  .visual-calendar-grid td.muted-cell {
+    color: #9ca3af;
+    background: #f9fafb;
+  }
+</style>
+{% endblock %}

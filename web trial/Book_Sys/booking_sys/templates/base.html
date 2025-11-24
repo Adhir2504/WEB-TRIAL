@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}UniBook{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- External CSS -->
+  <link rel="stylesheet" href="{% static 'css/mystyle.css' %}" />
+
+  <!-- Optional per-page extra styles -->
+  {% block extra_styles %}{% endblock %}
+</head>
+<body>
+  <!-- Top navigation -->
+  <header class="navbar">
+    <div class="nav-left">
+      <div class="brand">
+        <span class="brand-logo">B</span>
+        <span class="brand-name">UniBook</span>
+      </div>
+      <nav class="nav-links">
+        <a href="{% url 'booking_sys:home' %}" class="nav-link">Home</a>
+        <a href="{% url 'booking_sys:facilities' %}" class="nav-link">Facilities</a>
+        <a href="{% url 'booking_sys:calendar' %}" class="nav-link">Calendar</a>
+        {% if user.is_authenticated %}
+          <a href="{% url 'booking_sys:profile' %}" class="nav-link">Profile</a>
+        {% endif %}
+        {% if user.is_staff or user.member_type == 'admin' %}
+          <a href="{% url 'booking_sys:create_facility' %}" class="nav-link">Admin</a>
+        {% endif %}
+      </nav>
+    </div>
+
+    <div class="nav-right">
+        {% if user.is_authenticated %}
+          <a href="{% url 'booking_sys:profile' %}" class="btn btn-outline">{{ user.first_name }}</a>
+          <a href="{% url 'booking_sys:logout' %}" class="btn btn-primary">Logout</a>
+        {% else %}
+          <a href="{% url 'booking_sys:login' %}" class="btn btn-outline">Sign In</a>
+          <a href="{% url 'booking_sys:register' %}" class="btn btn-primary">Sign Up</a>
+        {% endif %}
+    </div>
+  </header>
+
+  <!-- Messages -->
+  {% if messages %}
+    <div class="page-container" style="margin-top: 1rem;">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}" style="padding: 0.75rem 1rem; margin-bottom: 0.5rem; border-radius: 8px; background: {% if message.tags == 'error' %}#fee2e2; color: #b91c1c;{% elif message.tags == 'success' %}#d1fae5; color: #065f46;{% else %}#dbeafe; color: #1e40af;{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Main page content -->
+  <main class="page-container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div>
+        <h4>UniBook</h4>
+        <p>Smart booking for university sports facilities.</p>
+      </div>
+      <div>
+        <h5>Support</h5>
+        <p>Email: <a href="mailto:sport@university.edu">sport@university.edu</a></p>
+        <p>Phone: +230 123 4567</p>
+      </div>
+      <div>
+        <h5>Contact Us</h5>
+        <p>University of Mauritius<br />Reduit, Mauritius</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

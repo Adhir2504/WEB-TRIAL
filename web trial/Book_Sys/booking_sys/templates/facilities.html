@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Facilities{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="section-header">
+    <h1>Book University Facilities</h1>
+    <p>Reserve recreational facilities and sports courts across campus. Stay active and make the most of your university experience.</p>
+  </div>
+
+  <!-- Search & filters -->
+  <form method="get" action="{% url 'booking_sys:search_facilities' %}">
+    <div class="filter-bar">
+      <div class="filter-field">
+        <label>Search facilities</label>
+        <div style="position: relative;">
+          <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);">🔍</span>
+          <input type="text" name="q" placeholder="Gym, Futsal, Badminton…" value="{{ query|default:'' }}" style="padding-left: 2.5rem;" />
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>Date</label>
+        <div style="position: relative;">
+          <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);">📅</span>
+          <input type="date" name="date" style="padding-left: 2.5rem;" />
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>Facility type</label>
+        <select name="type">
+          <option value="">All types</option>
+          <option value="sports" {% if selected_type == 'sports' %}selected{% endif %}>Sports</option>
+          <option value="recreation" {% if selected_type == 'recreation' %}selected{% endif %}>Recreation</option>
+          <option value="academic" {% if selected_type == 'academic' %}selected{% endif %}>Academic</option>
+          <option value="other" {% if selected_type == 'other' %}selected{% endif %}>Other</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <button type="submit" class="btn btn-primary filter-btn" style="width: 100%;">Search Facilities</button>
+      </div>
+    </div>
+  </form>
+  
+  <button class="btn btn-soft filter-more" style="margin-top: 0.75rem;">More Filters</button>
+  
+  {% if user.is_staff or user.member_type == 'admin' %}
+    <div style="margin-top: 1rem;">
+      <a href="{% url 'booking_sys:create_facility' %}" class="btn btn-primary">Create New Facility</a>
+      <a href="{% url 'booking_sys:create_court' %}" class="btn btn-outline">Create New Court</a>
+    </div>
+  {% endif %}
+
+  <!-- Facilities grid -->
+  <div class="card-grid facilities-grid">
+    {% if facilities_data %}
+      {% for item in facilities_data %}
+        {% with facility=item.facility next_slot=item.next_slot capacity=item.capacity %}
+          <article class="facility-card">
+            <div class="facility-image-wrapper">
+              <div class="facility-image {{ facility.facility_type }}-bg"></div>
+              <div class="facility-badge-overlay">
+                {% if facility.facility_status == 'available' %}
+                  <span class="badge badge-available">Available</span>
+                {% elif facility.facility_status == 'maintenance' %}
+                  <span class="badge badge-soon">Soon Available</span>
+                {% else %}
+                  <span class="badge badge-unavailable">Unavailable</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="facility-body">
+              <div class="facility-header">
+                <h3>{{ facility.facility_name|upper }}</h3>
+              </div>
+              <p class="facility-meta">{{ facility.location }} • {{ capacity|default:"N/A" }} People</p>
+              <p class="facility-text">
+                {{ facility.description|default:"A well-maintained facility for your sports and recreation needs."|truncatewords:20 }}
+              </p>
+              
+              {% if next_slot %}
+                <div class="facility-availability">
+                  <span style="font-size: 0.85rem; color: var(--text-muted);">
+                    Next available: 
+                    <strong style="color: var(--primary);">
+                      {% if next_slot.day_of_week == 0 %}Monday{% elif next_slot.day_of_week == 1 %}Tuesday{% elif next_slot.day_of_week == 2 %}Wednesday{% elif next_slot.day_of_week == 3 %}Thursday{% elif next_slot.day_of_week == 4 %}Friday{% elif next_slot.day_of_week == 5 %}Saturday{% else %}Sunday{% endif %} {{ next_slot.start_time|time:"g:i A" }} - {{ next_slot.end_time|time:"g:i A" }}
+                    </strong>
+                  </span>
+                </div>
+              {% else %}
+                <div class="facility-availability">
+                  <span style="font-size: 0.85rem; color: var(--text-muted);">
+                    Check availability for booking
+                  </span>
+                </div>
+              {% endif %}
+              
+              <div class="facility-features">
+                <span class="feature-icon">🏋️ Equipments</span>
+                <span class="feature-icon">🅿️ Free Parking</span>
+              </div>
+              
+              <div class="facility-actions">
+                <a href="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}" class="btn btn-outline">View Details</a>
+                {% if facility.facility_status == 'available' %}
+                  <a href="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}" class="btn btn-primary">Book Now</a>
+                {% else %}
+                  <button class="btn btn-disabled" disabled>Unavailable</button>
+                {% endif %}
+              </div>
+            </div>
+          </article>
+        {% endwith %}
+      {% endfor %}
+    {% else %}
+      <div style="grid-column: 1 / -1; text-align: center; padding: 2rem;">
+        <p>No facilities available at the moment. Please check back later.</p>
+        {% if user.is_staff or user.member_type == 'admin' %}
+          <a href="{% url 'booking_sys:create_facility' %}" class="btn btn-primary">Create Facility</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .facility-image-wrapper {
+    position: relative;
+    height: 180px;
+    overflow: hidden;
+  }
+  
+  .facility-image {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+  }
+  
+  .facility-badge-overlay {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+  
+  .badge-available {
+    background: #16a34a !important;
+    color: #ffffff !important;
+  }
+  
+  .badge-unavailable {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+  }
+  
+  .badge-soon {
+    background: #f59e0b !important;
+    color: #ffffff !important;
+  }
+  
+  .facility-availability {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    background: #f3f4f6;
+    border-radius: 8px;
+  }
+  
+  .facility-features {
+    display: flex;
+    gap: 0.75rem;
+    margin: 0.5rem 0;
+    flex-wrap: wrap;
+  }
+  
+  .feature-icon {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  
+  .btn-disabled {
+    background: #e5e7eb;
+    color: #9ca3af;
+    cursor: not-allowed;
+    border-color: #e5e7eb;
+  }
+  
+  .facilities-grid .facility-card {
+    min-height: 420px;
+  }
+  
+  .facility-body {
+    padding: 1rem;
+  }
+  
+  .facility-text {
+    margin: 0.5rem 0;
+    line-height: 1.5;
+    min-height: 3em;
+  }
+</style>
+{% endblock %}

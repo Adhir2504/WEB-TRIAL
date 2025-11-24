@@ -1,0 +1,329 @@
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.exceptions import ValidationError
+from django.utils.timezone import make_aware
+from datetime import datetime
+import uuid
+
+class User(AbstractUser):
+    MEMBER_TYPES = [
+        ('student', 'Student'),
+        ('staff', 'Staff'),
+        ('admin', 'Administrator'),
+    ]
+
+    #username - defined through AbstractUser - username = models.CharField(max_length=150, unique=True)
+    user_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(unique=True, verbose_name="User Email")
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100)
+    member_type = models.CharField(max_length=10, choices=MEMBER_TYPES)
+    user_phone = models.CharField(max_length=15, blank=True, null=True)
+    date_joined = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+    
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username','first_name', 'last_name', 'member_type']
+    
+    def __str__(self):
+        return f"{self.username} ({self.member_type})"
+    
+    def get_display_name(self):
+        """Returns the display name for user profiles"""
+        return self.username
+    
+    def edit_credentials(self, first_name, last_name, email, phone):
+        self.first_name = first_name
+        self.last_name = last_name
+        self.email = email
+        self.user_phone = phone
+        self.save()
+    
+    def display_credentials(self):
+        return f"Name: {self.first_name} {self.last_name}\nEmail: {self.email}\nPhone: {self.user_phone}"
+    
+    def deactivate_account(self):
+        self.is_active = False
+        self.save()
+
+class Student(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+    student_id = models.CharField(max_length=20, unique=True)
+    
+    def clean(self):
+        if self.user.member_type != 'student':
+            raise ValidationError("Only users with member_type 'student' can have a Student profile.")
+
+    def __str__(self):
+        return f"{self.user.username} - {self.student_id}"
+    
+
+class Staff(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+    department = models.CharField(max_length=100)
+
+    def clean(self):
+        if self.user.member_type != 'staff':
+            raise ValidationError("Only users with member_type 'staff' can have a Staff profile.")
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.department}"
+
+class Facility(models.Model):
+    FACILITY_TYPES = [
+        ('sports', 'Sports'),
+        ('recreation', 'Recreation'),
+        ('academic', 'Academic'),
+        ('other', 'Other'),
+    ]
+    
+    FACILITY_STATUS = [
+        ('available', 'Available'),
+        ('maintenance', 'Under Maintenance'),
+        ('closed', 'Closed'),
+    ]
+    
+    facility_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    facility_name = models.CharField(max_length=200)
+    facility_type = models.CharField(max_length=20, choices=FACILITY_TYPES)
+    location = models.CharField(max_length=300)
+    description = models.TextField(blank=True)
+    facility_status = models.CharField(max_length=20, choices=FACILITY_STATUS, default='available')
+    
+    def __str__(self):
+        return self.facility_name
+    
+    def change_status(self, new_status):
+        self.facility_status = new_status
+        self.save()
+
+class Court(models.Model):
+    COURT_STATUS = [
+        ('available', 'Available'),
+        ('maintenance', 'Under Maintenance'),
+        ('closed', 'Closed'),
+    ]
+    
+    court_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    facility = models.ForeignKey(Facility, on_delete=models.CASCADE, related_name='courts')
+    court_name = models.CharField(max_length=200)
+    sport_type = models.CharField(max_length=100)
+    capacity = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(1000)])
+    notes = models.TextField(blank=True, default="None")
+    court_status = models.CharField(max_length=20, choices=COURT_STATUS, default='available')
+    
+    def __str__(self):
+        return f"{self.court_name} ({self.facility.facility_name})"
+    
+    def is_available_on(self, day, time):
+        """Check if court is available on given day and time"""
+        try:
+            availability = self.availabilities.get(day_of_week=day)
+            if not (availability.open_time <= time <= availability.close_time):
+                return False
+        except Availability.DoesNotExist:
+            return False
+        
+        dummy_date = datetime(2025, 1, 1)
+        check_dt = make_aware(datetime.combine(dummy_date, time))
+
+        """Check for Blackouts"""
+        blackout_exists = self.blackouts.filter(
+            start_date_time__lte=check_dt,
+            end_date_time__gte=check_dt
+        ).exists()
+
+        if blackout_exists:
+            return False
+
+        """Check for existing bookings"""
+        slot = self.slots.filter(
+            day_of_week=day,
+            start_time__lte=time,
+            end_time__gte=time,
+            slot_status='available'
+        ).first()
+
+        if slot is None:
+            return False
+
+        # If the slot exists but is booked
+        if slot.slot_status != 'available':
+            return False
+
+        return True
+    
+    def edit_notes(self, new_notes):
+        self.notes = new_notes
+        self.save()
+    
+    def change_status(self, new_status):
+        self.court_status = new_status
+        self.save()
+
+class Availability(models.Model):
+    DAYS_OF_WEEK = [
+        (0, 'Monday'),
+        (1, 'Tuesday'),
+        (2, 'Wednesday'),
+        (3, 'Thursday'),
+        (4, 'Friday'),
+        (5, 'Saturday'),
+        (6, 'Sunday'),
+    ]
+    
+    court = models.ForeignKey(Court, on_delete=models.CASCADE, related_name='availabilities')
+    day_of_week = models.IntegerField(choices=DAYS_OF_WEEK)
+    open_time = models.TimeField()
+    close_time = models.TimeField()
+    notes = models.TextField(blank=True, default="None")
+    
+    class Meta:
+        unique_together = ('court', 'day_of_week')
+
+    def clean(self):
+        if self.open_time >= self.close_time:
+            raise ValidationError("Opening time must be earlier than closing time.")
+
+    
+    def __str__(self):
+        return f"{self.court.court_name} - {self.day_of_week} ({self.open_time} to {self.close_time})"
+    
+    def edit_notes(self, new_notes):
+        self.notes = new_notes
+        self.save()
+
+class Slot(models.Model):
+    SLOT_TYPES = [
+        ('regular', 'Regular'),
+        ('peak', 'Peak Hours'),
+        ('off_peak', 'Off-Peak'),
+    ]
+    
+    SLOT_STATUS = [
+        ('available', 'Available'),
+        ('booked', 'Booked'),
+        ('blocked', 'Blocked'),
+    ]
+    
+    slot_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    court = models.ForeignKey(Court, on_delete=models.CASCADE, related_name='slots')
+    day_of_week = models.IntegerField(choices=Availability.DAYS_OF_WEEK)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    slot_type = models.CharField(max_length=10, choices=SLOT_TYPES, default='regular')
+    slot_status = models.CharField(max_length=20, choices=SLOT_STATUS, default='available')
+    
+    def clean(self):
+        if self.start_time >= self.end_time:
+            raise ValidationError("Slot start time must be earlier than end time.")
+
+
+    def __str__(self):
+        return f"{self.court.court_name} - {self.day_of_week} {self.start_time}-{self.end_time}"
+    
+    def change_status(self, new_status):
+        self.slot_status = new_status
+        self.save()
+
+class Booking(models.Model):
+    FULFILLMENT_STATUS = [
+        ('no', 'No'),
+        ('yes', 'Yes'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    booking_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
+    slot = models.ForeignKey(Slot, on_delete=models.CASCADE, related_name='bookings')
+    booking_date_time = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True, default="None")
+    fulfilled = models.CharField(max_length=10, choices=FULFILLMENT_STATUS, default='no')
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['slot'], name='unique_slot_booking')
+        ]
+    
+    def __str__(self):
+        return f"Booking {self.booking_id} - {self.user.first_name}"
+    
+    def fulfill_booking(self):
+        self.fulfilled = 'yes'
+        self.save()
+    
+    def cancel_booking(self):
+        self.fulfilled = 'cancelled'
+        self.save()
+
+        still_booked = self.slot.bookings.filter(fulfilled='no').exists()
+        if not still_booked:
+            self.slot.change_status('available')
+
+class Blackout(models.Model):
+    blackout_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    court = models.ForeignKey(Court, on_delete=models.CASCADE, related_name='blackouts')
+    start_date_time = models.DateTimeField()
+    end_date_time = models.DateTimeField()
+    reason = models.TextField()
+
+    def clean(self):
+        overlaps = Blackout.objects.filter(
+            court=self.court,
+            start_date_time__lt=self.end_date_time,
+            end_date_time__gt=self.start_date_time
+        ).exclude(pk=self.pk)
+
+        if overlaps.exists():
+            raise ValidationError("Blackout period overlaps with an existing blackout.")
+    
+    def __str__(self):
+        return f"Blackout {self.blackout_id} - {self.court.court_name}"
+
+class Notification(models.Model):
+    NOTIFICATION_CHANNELS = [
+        ('email', 'Email'),
+        ('sms', 'SMS'),
+        ('both', 'Both'),
+    ]
+    
+    notif_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='notifications')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    notif_text = models.TextField()
+    notif_channel = models.CharField(max_length=10, choices=NOTIFICATION_CHANNELS, default='email')
+    sent_date_time = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Notification {self.notif_id} - {self.user.first_name}"
+
+class AuditLog(models.Model):
+    ENTRY_TYPES = [
+        ('create', 'Create'),
+        ('update', 'Update'),
+        ('delete', 'Delete'),
+        ('login', 'Login'),
+        ('logout', 'Logout'),
+        ('booking', 'Booking'),
+        ('cancellation', 'Cancellation'),
+    ]
+    
+    audit_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    entry_type = models.CharField(max_length=20, choices=ENTRY_TYPES)
+    entry_sub_type = models.CharField(max_length=50, blank=True)
+    user_involved = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    entry_date_time = models.DateTimeField(auto_now_add=True)
+    entry_desc = models.TextField(default="None")
+    
+    def __str__(self):
+        return f"Audit {self.audit_id} - {self.entry_type}"
+    
+    @classmethod
+    def create_entry(cls, entry_type, entry_sub_type="", user=None, description="None"):
+        return cls.objects.create(
+            entry_type=entry_type,
+            entry_sub_type=entry_sub_type,
+            user_involved=user,
+            entry_desc=description
+        )

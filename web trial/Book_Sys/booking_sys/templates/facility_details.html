@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · {{ facility.facility_name }}{% endblock %}
+
+{% block content %}
+<section class="section facility-detail">
+  <div class="facility-main">
+    <div class="facility-hero-image {{ facility.facility_type }}-bg large"></div>
+
+    <div class="facility-info-card">
+      <h1>{{ facility.facility_name }}</h1>
+      <div class="facility-info-meta">
+        <span>📍 {{ facility.location }}</span>
+        <span>🏷️ {{ facility.get_facility_type_display }}</span>
+        <span>{% if facility.facility_status == 'available' %}✅ Available{% elif facility.facility_status == 'maintenance' %}⚠️ Under Maintenance{% else %}❌ Closed{% endif %}</span>
+      </div>
+      <p>{{ facility.description|default:"No description available." }}</p>
+      
+      {% if courts %}
+        <div style="margin-top: 1rem;">
+          <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Courts:</h3>
+          <ul style="margin: 0; padding-left: 1.5rem;">
+            {% for court in courts %}
+              <li>{{ court.court_name }} - {{ court.sport_type }} (Capacity: {{ court.capacity }})</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Facility rules -->
+    <div class="facility-rules-card">
+      <h2>Facilities Rules</h2>
+      <ul>
+        <li>Must wear appropriate athletic attire.</li>
+        <li>Maximum 2-hour sessions during peak hours.</li>
+        <li>No food or drinks except water inside the court.</li>
+        <li>Please arrive on time for your booking.</li>
+        <li>Cancellations must be made at least 2 hours in advance.</li>
+      </ul>
+    </div>
+
+    <!-- Contact information -->
+    <div class="facility-contact-card">
+      <h2>Contact information</h2>
+      <p>For queries and special arrangements, email:</p>
+      <a href="mailto:sports@university.edu" class="contact-chip">
+        ✉ sports@university.edu
+      </a>
+    </div>
+  </div>
+
+  <!-- Booking sidebar -->
+  <aside class="booking-sidebar">
+    <div class="booking-card">
+      <h2>Book this facility</h2>
+      
+      {% if user.is_authenticated %}
+        {% if facility.facility_status == 'available' %}
+          {% if booking_form %}
+            <form method="post" action="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}">
+              {% csrf_token %}
+              
+              <label class="form-label">Select Available Slot</label>
+              {{ booking_form.slot }}
+              {% if booking_form.slot.errors %}
+                <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ booking_form.slot.errors }}</div>
+              {% endif %}
+              
+              {% if available_slots %}
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
+                  {{ available_slots.count }} slot{{ available_slots.count|pluralize }} available
+                </p>
+              {% else %}
+                <p style="font-size: 0.85rem; color: var(--warning); margin-top: 0.5rem;">
+                  No slots available at the moment.
+                </p>
+              {% endif %}
+
+              <label class="form-label">Additional Notes (Optional)</label>
+              {{ booking_form.notes }}
+              {% if booking_form.notes.errors %}
+                <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ booking_form.notes.errors }}</div>
+              {% endif %}
+
+              <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1rem;" {% if not available_slots %}disabled{% endif %}>Confirm Booking</button>
+            </form>
+          {% else %}
+            <p>No booking form available.</p>
+          {% endif %}
+        {% else %}
+          <p style="color: var(--text-muted);">This facility is currently {{ facility.get_facility_status_display|lower }}.</p>
+        {% endif %}
+      {% else %}
+        <p style="color: var(--text-muted); margin-bottom: 1rem;">Please log in to make a booking.</p>
+        <a href="{% url 'booking_sys:login' %}" class="btn btn-primary btn-block">Sign In to Book</a>
+      {% endif %}
+
+      <p class="booking-note">
+        ⚠ By booking this facility, you agree to follow all facility rules and university policies.
+        Cancellations must be made at least 2 hours in advance.
+      </p>
+    </div>
+  </aside>
+</section>
+{% endblock %}

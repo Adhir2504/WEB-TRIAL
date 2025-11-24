@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Home{% endblock %}
+
+{% block content %}
+
+<!-- Hero / banner -->
+<section class="hero">
+  <div class="hero-content">
+    <p class="hero-tag">WELCOME TO UNIBOOK.</p>
+    <h1>Reserve football, volleyball and badminton courts instantly.</h1>
+    <p class="hero-subtitle">
+      No more waiting in line or dealing with paper schedules. Book, manage and track your facility usage online.
+    </p>
+    <div class="hero-actions">
+        <a href="{% url 'booking_sys:facilities' %}" class="btn btn-primary">Browse Facilities</a>
+        <a href="{% url 'booking_sys:profile' %}" class="btn btn-outline">View My Bookings</a>
+    </div>
+
+  </div>
+  <div class="hero-image">
+    <!-- You can replace this with a real image using CSS background -->
+    <div class="hero-image-placeholder">Sports Banner</div>
+  </div>
+</section>
+
+<!-- Overview of facilities / available slots -->
+<section class="section">
+  <div class="section-header">
+    <h2>Overview of Facilities</h2>
+    <p>Check today’s availability and quickly book the slots you need.</p>
+  </div>
+
+  <div class="card-grid">
+    {% if facilities %}
+      {% for facility in facilities|slice:":3" %}
+        <article class="facility-card">
+          <div class="facility-image {{ facility.facility_type }}-bg"></div>
+          <div class="facility-body">
+            <div class="facility-header">
+              <h3>{{ facility.facility_name|upper }}</h3>
+              {% if facility.facility_status == 'available' %}
+                <span class="badge" style="background:#16a34a;color:#fff;">Available</span>
+              {% elif facility.facility_status == 'maintenance' %}
+                <span class="badge badge-warning">Limited</span>
+              {% else %}
+                <span class="badge badge-danger">Closed</span>
+              {% endif %}
+            </div>
+            <p class="facility-meta">@ {{ facility.location }} &bull; {{ facility.get_facility_type_display }}</p>
+            <p class="facility-text">
+              {{ facility.description|default:"No description available."|truncatewords:15 }}
+            </p>
+            <ul class="facility-tags">
+              <li>{{ facility.get_facility_type_display }} facility</li>
+              <li>{{ facility.get_facility_status_display }}</li>
+            </ul>
+            <div class="facility-actions">
+                <a href="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}" class="btn btn-outline">View Details</a>
+                {% if facility.facility_status == 'available' %}
+                  <a href="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}" class="btn btn-primary">Book Now</a>
+                {% endif %}
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+    {% else %}
+      <!-- Default sample facilities if database is empty -->
+      <article class="facility-card">
+        <div class="facility-image futsal-bg"></div>
+        <div class="facility-body">
+          <div class="facility-header">
+            <h3>FUTSAL</h3>
+            <span class="badge" style="background:#16a34a;color:#fff;">Available</span>
+          </div>
+          <p class="facility-meta">@ Gymnasium &bull; Sports</p>
+          <p class="facility-text">
+            Indoor synthetic pitch with quality lighting and score display.
+          </p>
+          <ul class="facility-tags">
+            <li>Sports facility</li>
+            <li>Available</li>
+          </ul>
+          <div class="facility-actions">
+              <a href="{% url 'booking_sys:facilities' %}" class="btn btn-outline">View Details</a>
+              <a href="{% url 'booking_sys:facilities' %}" class="btn btn-primary">Book Now</a>
+          </div>
+        </div>
+      </article>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Quick access -->
+<section class="section">
+  <div class="section-header centered">
+    <h2>Quick Access</h2>
+    <p>Everything you need to manage your gym experience in one place.</p>
+  </div>
+
+  <div class="pill-grid">
+    <article class="pill-card">
+      <h3>User Profile</h3>
+      <p>Manage your account, view user preferences and booking history.</p>
+      <a href="{% url 'booking_sys:profile' %}" class="btn btn-soft">Go to Profile</a>
+    </article>
+
+    <article class="pill-card">
+      <h3>All Courts</h3>
+      <p>Browse available courts, check schedules and view facility details.</p>
+      <a href="{% url 'booking_sys:facilities' %}" class="btn btn-soft">See facilities</a>
+    </article>
+
+    <article class="pill-card">
+      <h3>Book a Court</h3>
+      <p>Reserve your spot for football, badminton, volleyball and more.</p>
+      <a href="{% url 'booking_sys:facilities' %}" class="btn btn-soft">Start booking</a>
+    </article>
+  </div>
+</section>
+
+<!-- Updates -->
+<section class="section">
+  <div class="section-header centered">
+    <h2>Updates</h2>
+  </div>
+  <div class="pill-grid">
+    <article class="pill-card">
+      <h3>Operating Hours &amp; Access</h3>
+      <ul class="updates-list">
+        <li>General hours: 8:00 AM – 6:00 PM (Mon – Sat)</li>
+        <li>Staff priority: 12:00 PM – 1:00 PM</li>
+        <li>Reserved exclusively for university staff</li>
+      </ul>
+    </article>
+
+    <article class="pill-card">
+      <h3>Announcements</h3>
+      <ul class="updates-list">
+        <li>New badminton nets installed.</li>
+        <li>Inter-faculty futsal league starts next month.</li>
+        <li>Download the UniBook app for faster check-in.</li>
+      </ul>
+      <a href="{% url 'booking_sys:calendar' %}" class="btn btn-soft">View announcements</a>
+    </article>
+  </div>
+</section>
+
+{% endblock %}
