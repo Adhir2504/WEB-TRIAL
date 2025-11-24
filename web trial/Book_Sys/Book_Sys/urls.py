@@ -19,14 +19,15 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+# UniBook booking system - must come before admin to avoid conflicts
 urlpatterns = [
-    path('admin/', admin.site.urls),
-]
-
-# UniBook booking system
-urlpatterns += [
     path('', include(('booking_sys.urls', 'booking_sys'), namespace='booking_sys')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Django admin - must come after booking_sys URLs
+urlpatterns += [
+    path('admin/', admin.site.urls),
+]
 
 # Auth
 urlpatterns += [

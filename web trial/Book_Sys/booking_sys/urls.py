@@ -21,10 +21,13 @@ urlpatterns = [
     path('booking/create/', views.create_booking, name='create_booking'),
     path('booking/<uuid:booking_id>/cancel/', views.cancel_booking, name='cancel_booking'),
     
-    # Admin functions (GET and POST)
-    path('admin/facility/create/', views.create_facility, name='create_facility'),
-    path('admin/court/create/', views.create_court, name='create_court'),
-    path('admin/slot/create/', views.create_slot, name='create_slot'),
-    path('admin/blackout/create/', views.create_blackout, name='create_blackout'),
-    path('admin/availability/create/', views.create_availability, name='create_availability'),
+    # Admin functions (GET and POST) - using 'manage' prefix to avoid conflict with Django admin
+    path('manage/dashboard/', views.admin_dashboard, name='admin_dashboard'),
+    path('manage/facility/create/', views.create_facility, name='create_facility'),
+    path('manage/facility/<uuid:facility_id>/edit/', views.edit_facility, name='edit_facility'),
+    path('manage/court/create/', views.create_court, name='create_court'),
+    path('manage/slot/create/', views.create_slot, name='create_slot'),
+    path('manage/blackout/create/', views.create_blackout, name='create_blackout'),
+    path('manage/availability/create/', views.create_availability, name='create_availability'),
+    path('manage/announcement/create/', views.create_announcement, name='create_announcement'),
 ]

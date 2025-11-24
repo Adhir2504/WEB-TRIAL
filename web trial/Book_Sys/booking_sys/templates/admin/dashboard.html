@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Admin Dashboard{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="section-header">
+    <h1>Admin Dashboard</h1>
+    <p>Manage facilities, announcements, and system settings</p>
+  </div>
+
+  <!-- Quick Stats -->
+  <div class="card-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 2rem;">
+    <div class="card-section">
+      <h3 style="margin: 0; font-size: 2rem; color: var(--primary);">{{ total_facilities }}</h3>
+      <p style="margin: 0.5rem 0 0 0; color: var(--text-muted);">Total Facilities</p>
+    </div>
+    <div class="card-section">
+      <h3 style="margin: 0; font-size: 2rem; color: var(--primary);">{{ total_courts }}</h3>
+      <p style="margin: 0.5rem 0 0 0; color: var(--text-muted);">Total Courts</p>
+    </div>
+    <div class="card-section">
+      <h3 style="margin: 0; font-size: 2rem; color: var(--primary);">{{ active_bookings }}</h3>
+      <p style="margin: 0.5rem 0 0 0; color: var(--text-muted);">Active Bookings</p>
+    </div>
+    <div class="card-section">
+      <h3 style="margin: 0; font-size: 2rem; color: var(--primary);">{{ total_users }}</h3>
+      <p style="margin: 0.5rem 0 0 0; color: var(--text-muted);">Total Users</p>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="card-section" style="margin-bottom: 2rem;">
+    <h2 style="margin-top: 0;">Quick Actions</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+      <a href="{% url 'booking_sys:create_facility' %}" class="btn btn-primary" style="text-align: center; padding: 1rem;">
+        ➕ Add Facility
+      </a>
+      <a href="{% url 'booking_sys:create_court' %}" class="btn btn-primary" style="text-align: center; padding: 1rem;">
+        🏟️ Add Court
+      </a>
+      <a href="{% url 'booking_sys:create_announcement' %}" class="btn btn-primary" style="text-align: center; padding: 1rem;">
+        📢 Create Announcement
+      </a>
+      <a href="{% url 'booking_sys:create_slot' %}" class="btn btn-outline" style="text-align: center; padding: 1rem;">
+        ⏰ Add Time Slot
+      </a>
+      <a href="{% url 'booking_sys:create_availability' %}" class="btn btn-outline" style="text-align: center; padding: 1rem;">
+        📅 Set Availability
+      </a>
+      <a href="{% url 'booking_sys:create_blackout' %}" class="btn btn-outline" style="text-align: center; padding: 1rem;">
+        🚫 Create Blackout
+      </a>
+      <a href="/admin/" class="btn btn-outline" style="text-align: center; padding: 1rem;">
+        ⚙️ Django Admin
+      </a>
+    </div>
+  </div>
+
+  <!-- Facilities Management -->
+  <div class="card-section" style="margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h2 style="margin: 0;">Facilities Management</h2>
+      <a href="{% url 'booking_sys:create_facility' %}" class="btn btn-primary">➕ Add New Facility</a>
+    </div>
+    {% if all_facilities %}
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border-subtle);">
+              <th style="text-align: left; padding: 0.75rem;">Facility Name</th>
+              <th style="text-align: left; padding: 0.75rem;">Type</th>
+              <th style="text-align: left; padding: 0.75rem;">Location</th>
+              <th style="text-align: left; padding: 0.75rem;">Status</th>
+              <th style="text-align: left; padding: 0.75rem;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for facility in all_facilities %}
+              <tr style="border-bottom: 1px solid var(--border-subtle);">
+                <td style="padding: 0.75rem;">
+                  <strong>{{ facility.facility_name }}</strong>
+                </td>
+                <td style="padding: 0.75rem;">{{ facility.get_facility_type_display }}</td>
+                <td style="padding: 0.75rem;">{{ facility.location }}</td>
+                <td style="padding: 0.75rem;">
+                  <span style="padding: 0.25rem 0.75rem; background: {% if facility.facility_status == 'available' %}#d1fae5{% elif facility.facility_status == 'maintenance' %}#fef3c7{% else %}#fee2e2{% endif %}; color: {% if facility.facility_status == 'available' %}#065f46{% elif facility.facility_status == 'maintenance' %}#92400e{% else %}#b91c1c{% endif %}; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                    {{ facility.get_facility_status_display }}
+                  </span>
+                </td>
+                <td style="padding: 0.75rem;">
+                  <div style="display: flex; gap: 0.5rem;">
+                    <a href="{% url 'booking_sys:edit_facility' facility.facility_id %}" class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">✏️ Edit</a>
+                    <a href="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}" class="btn btn-soft" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">👁️ View</a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted);">No facilities yet. <a href="{% url 'booking_sys:create_facility' %}">Create one</a></p>
+    {% endif %}
+  </div>
+
+  <!-- Recent Announcements -->
+  <div class="card-section" style="margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h2 style="margin: 0;">Recent Announcements</h2>
+      <a href="{% url 'booking_sys:create_announcement' %}" class="btn btn-soft">Create New</a>
+    </div>
+    {% if recent_announcements %}
+      <ul style="list-style: none; padding: 0; margin: 0;">
+        {% for announcement in recent_announcements %}
+          <li style="padding: 1rem; border-bottom: 1px solid var(--border-subtle);">
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+              <div>
+                <h3 style="margin: 0 0 0.5rem 0;">{{ announcement.title }}</h3>
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.9rem;">{{ announcement.content|truncatewords:20 }}</p>
+                <p style="margin: 0.5rem 0 0 0; color: var(--text-muted); font-size: 0.85rem;">
+                  Created: {{ announcement.created_at|date:"M d, Y" }} | 
+                  Priority: {{ announcement.get_priority_display }} | 
+                  Status: {{ announcement.get_status_display }}
+                </p>
+              </div>
+              <span style="padding: 0.25rem 0.75rem; background: {% if announcement.is_featured %}#fbbf24{% else %}#e5e7eb{% endif %}; color: {% if announcement.is_featured %}#78350f{% else %}#6b7280{% endif %}; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                {% if announcement.is_featured %}⭐ Featured{% else %}Normal{% endif %}
+              </span>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p style="color: var(--text-muted);">No announcements yet. <a href="{% url 'booking_sys:create_announcement' %}">Create one</a></p>
+    {% endif %}
+  </div>
+
+  <!-- Recent Bookings -->
+  <div class="card-section" style="margin-bottom: 2rem;">
+    <h2 style="margin-top: 0;">Recent Bookings</h2>
+    {% if recent_bookings %}
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border-subtle);">
+              <th style="text-align: left; padding: 0.75rem;">User</th>
+              <th style="text-align: left; padding: 0.75rem;">Facility</th>
+              <th style="text-align: left; padding: 0.75rem;">Court</th>
+              <th style="text-align: left; padding: 0.75rem;">Date</th>
+              <th style="text-align: left; padding: 0.75rem;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for booking in recent_bookings %}
+              <tr style="border-bottom: 1px solid var(--border-subtle);">
+                <td style="padding: 0.75rem;">{{ booking.user.first_name }} {{ booking.user.last_name }}</td>
+                <td style="padding: 0.75rem;">{{ booking.slot.court.facility.facility_name }}</td>
+                <td style="padding: 0.75rem;">{{ booking.slot.court.court_name }}</td>
+                <td style="padding: 0.75rem;">{{ booking.booking_date_time|date:"M d, Y g:i A" }}</td>
+                <td style="padding: 0.75rem;">
+                  <span style="padding: 0.25rem 0.75rem; background: {% if booking.fulfilled == 'yes' %}#d1fae5{% elif booking.fulfilled == 'cancelled' %}#fee2e2{% else %}#dbeafe{% endif %}; color: {% if booking.fulfilled == 'yes' %}#065f46{% elif booking.fulfilled == 'cancelled' %}#b91c1c{% else %}#1e40af{% endif %}; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                    {{ booking.get_fulfilled_display }}
+                  </span>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted);">No bookings yet.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+

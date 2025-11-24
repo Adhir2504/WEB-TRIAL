@@ -9,6 +9,14 @@
       <h1 style="margin-top: 0;">Create Account</h1>
       <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Join UniBook to start booking facilities today!</p>
 
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }}" style="padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 8px; background: {% if message.tags == 'error' %}#fee2e2; color: #b91c1c;{% elif message.tags == 'success' %}#d1fae5; color: #065f46;{% else %}#dbeafe; color: #1e40af;{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+
       <form method="post" action="{% url 'booking_sys:register' %}">
         {% csrf_token %}
         

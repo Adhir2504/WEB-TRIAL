@@ -6,22 +6,39 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.contrib.auth.forms import AuthenticationForm
+from django.db import models
 from .models import (
     User, Student, Staff, Facility, Court, Slot, Booking, 
-    Blackout, Availability, Notification
+    Blackout, Availability, Notification, Announcement
 )
 from .forms import (
     UserRegistrationForm, UserProfileEditForm, StudentProfileForm, 
     StaffProfileForm, FacilityForm, CourtForm, SlotForm, BookingForm, 
-    BlackoutForm, AvailabilityForm, NotificationForm
+    BlackoutForm, AvailabilityForm, NotificationForm, AnnouncementForm
 )
 
 
 # Home view - GET only
 def home(request):
     """Home page view - displays welcome page"""
+    from django.utils import timezone
+    
     facilities = Facility.objects.filter(facility_status='available')[:6]
-    return render(request, 'home.html', {'facilities': facilities})
+    
+    # Get active announcements
+    now = timezone.now()
+    announcements = Announcement.objects.filter(
+        status='published'
+    ).filter(
+        models.Q(publish_date__isnull=True) | models.Q(publish_date__lte=now)
+    ).filter(
+        models.Q(expiry_date__isnull=True) | models.Q(expiry_date__gte=now)
+    ).order_by('-is_featured', '-created_at')[:5]
+    
+    return render(request, 'home.html', {
+        'facilities': facilities,
+        'announcements': announcements
+    })
 
 
 # Facilities list view - GET only
@@ -135,6 +152,9 @@ def facility_detail(request, slug):
 @require_http_methods(["GET"])
 def calendar_view(request):
     """Display interactive calendar view"""
+    from calendar import monthcalendar, month_name
+    from datetime import date
+    
     courts = Court.objects.filter(court_status='available')
 
     # Get user's bookings if logged in
@@ -177,6 +197,58 @@ def calendar_view(request):
         selected_entry = calendar_days[selected_index]
         selected_day_bookings = selected_entry['bookings']
 
+    # Generate dynamic calendar grid
+    today = timezone.localdate()
+    current_year = today.year
+    current_month = today.month
+    current_day = today.day
+    
+    # Get calendar grid for current month
+    cal = monthcalendar(current_year, current_month)
+    
+    # Get previous and next month info
+    if current_month == 1:
+        prev_month = 12
+        prev_year = current_year - 1
+    else:
+        prev_month = current_month - 1
+        prev_year = current_year
+    
+    if current_month == 12:
+        next_month = 1
+        next_year = current_year + 1
+    else:
+        next_month = current_month + 1
+        next_year = current_year
+    
+    # Get days with bookings for highlighting
+    # Create a mapping of actual dates to whether they have events
+    # For simplicity, we'll check if any booking exists for each day of week
+    days_with_events = set()
+    for booking in upcoming_bookings:
+        days_with_events.add(booking.slot.day_of_week)
+    
+    # Create calendar weeks with proper formatting
+    calendar_weeks = []
+    for week in cal:
+        week_data = []
+        for day_index, day in enumerate(week):
+            if day == 0:
+                week_data.append({'day': None, 'is_today': False, 'has_event': False, 'is_current_month': False})
+            else:
+                is_today = (day == current_day)
+                # monthcalendar returns weeks starting Monday (index 0 = Monday)
+                # day_index: 0=Monday, 1=Tuesday, ..., 6=Sunday
+                # Our booking.slot.day_of_week: 0=Monday, 1=Tuesday, ..., 6=Sunday
+                has_event = day_index in days_with_events
+                week_data.append({
+                    'day': day,
+                    'is_today': is_today,
+                    'has_event': has_event,
+                    'is_current_month': True
+                })
+        calendar_weeks.append(week_data)
+
     context = {
         'courts': courts,
         'user_bookings': user_bookings,
@@ -185,7 +257,14 @@ def calendar_view(request):
         'selected_day_bookings': selected_day_bookings,
         'selected_day_index': selected_index,
         'selected_day_entry': selected_entry,
-        'current_month_label': timezone.localdate().strftime('%B %Y'),
+        'current_month_label': today.strftime('%B %Y'),
+        'calendar_weeks': calendar_weeks,
+        'current_year': current_year,
+        'current_month': current_month,
+        'prev_month': prev_month,
+        'prev_year': prev_year,
+        'next_month': next_month,
+        'next_year': next_year,
     }
     return render(request, 'calendar.html', context)
 
@@ -327,6 +406,9 @@ def logout_view(request):
 @require_http_methods(["GET", "POST"])
 def register(request):
     """User registration view - handles GET and POST requests"""
+    if request.user.is_authenticated:
+        return redirect('booking_sys:home')
+    
     if request.method == 'GET':
         form = UserRegistrationForm()
         return render(request, 'registration/register.html', {'form': form})
@@ -404,13 +486,13 @@ def create_booking(request):
 @require_http_methods(["GET", "POST"])
 def create_facility(request):
     """Create a facility - handles GET and POST requests (Admin only)"""
-    if not request.user.is_staff and request.user.member_type != 'admin':
+    if not (request.user.is_staff or request.user.member_type == 'admin'):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('booking_sys:home')
     
     if request.method == 'GET':
         form = FacilityForm()
-        return render(request, 'admin/create_facility.html', {'form': form})
+        return render(request, 'admin/create_facility.html', {'form': form, 'is_edit': False})
     
     elif request.method == 'POST':
         form = FacilityForm(request.POST)
@@ -420,7 +502,41 @@ def create_facility(request):
             return redirect('booking_sys:facilities')
         else:
             messages.error(request, 'Please correct the errors below.')
-            return render(request, 'admin/create_facility.html', {'form': form})
+            return render(request, 'admin/create_facility.html', {'form': form, 'is_edit': False})
+
+
+# Facility edit (Admin) - GET and POST
+@login_required
+@require_http_methods(["GET", "POST"])
+def edit_facility(request, facility_id):
+    """Edit a facility - handles GET and POST requests (Admin only)"""
+    if not (request.user.is_staff or request.user.member_type == 'admin'):
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('booking_sys:home')
+    
+    facility = get_object_or_404(Facility, facility_id=facility_id)
+    
+    if request.method == 'GET':
+        form = FacilityForm(instance=facility)
+        return render(request, 'admin/create_facility.html', {
+            'form': form,
+            'facility': facility,
+            'is_edit': True
+        })
+    
+    elif request.method == 'POST':
+        form = FacilityForm(request.POST, instance=facility)
+        if form.is_valid():
+            facility = form.save()
+            messages.success(request, f'Facility "{facility.facility_name}" updated successfully!')
+            return redirect('booking_sys:facilities')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+            return render(request, 'admin/create_facility.html', {
+                'form': form,
+                'facility': facility,
+                'is_edit': True
+            })
 
 
 # Court creation (Admin) - GET and POST
@@ -428,7 +544,7 @@ def create_facility(request):
 @require_http_methods(["GET", "POST"])
 def create_court(request):
     """Create a court - handles GET and POST requests (Admin only)"""
-    if not request.user.is_staff and request.user.member_type != 'admin':
+    if not (request.user.is_staff or request.user.member_type == 'admin'):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('booking_sys:home')
     
@@ -452,7 +568,7 @@ def create_court(request):
 @require_http_methods(["GET", "POST"])
 def create_slot(request):
     """Create a slot - handles GET and POST requests (Admin only)"""
-    if not request.user.is_staff and request.user.member_type != 'admin':
+    if not (request.user.is_staff or request.user.member_type == 'admin'):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('booking_sys:home')
     
@@ -476,7 +592,7 @@ def create_slot(request):
 @require_http_methods(["GET", "POST"])
 def create_blackout(request):
     """Create a blackout period - handles GET and POST requests (Admin only)"""
-    if not request.user.is_staff and request.user.member_type != 'admin':
+    if not (request.user.is_staff or request.user.member_type == 'admin'):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('booking_sys:home')
     
@@ -500,7 +616,7 @@ def create_blackout(request):
 @require_http_methods(["GET", "POST"])
 def create_availability(request):
     """Create availability schedule - handles GET and POST requests (Admin only)"""
-    if not request.user.is_staff and request.user.member_type != 'admin':
+    if not (request.user.is_staff or request.user.member_type == 'admin'):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('booking_sys:home')
     
@@ -517,6 +633,74 @@ def create_availability(request):
         else:
             messages.error(request, 'Please correct the errors below.')
             return render(request, 'admin/create_availability.html', {'form': form})
+
+
+# Announcement creation (Admin) - GET and POST
+@login_required
+@require_http_methods(["GET", "POST"])
+def create_announcement(request):
+    """Create an announcement - handles GET and POST requests (Admin only)"""
+    if not (request.user.is_staff or request.user.member_type == 'admin'):
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('booking_sys:home')
+    
+    if request.method == 'GET':
+        form = AnnouncementForm()
+        return render(request, 'admin/create_announcement.html', {'form': form})
+    
+    elif request.method == 'POST':
+        form = AnnouncementForm(request.POST)
+        if form.is_valid():
+            announcement = form.save(commit=False)
+            announcement.created_by = request.user
+            announcement.save()
+            messages.success(request, f'Announcement "{announcement.title}" created successfully!')
+            return redirect('booking_sys:admin_dashboard')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+            return render(request, 'admin/create_announcement.html', {'form': form})
+
+
+# Admin Dashboard - GET only
+@login_required
+@require_http_methods(["GET"])
+def admin_dashboard(request):
+    """Admin dashboard with quick stats and actions"""
+    if not (request.user.is_staff or request.user.member_type == 'admin'):
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('booking_sys:home')
+    
+    # Get statistics
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    total_facilities = Facility.objects.count()
+    total_courts = Court.objects.count()
+    total_bookings = Booking.objects.count()
+    active_bookings = Booking.objects.filter(fulfilled='no').count()
+    total_users = User.objects.count()
+    recent_announcements = Announcement.objects.filter(status='published').order_by('-created_at')[:5]
+    
+    # Recent activity
+    recent_bookings = Booking.objects.order_by('-booking_date_time')[:10]
+    recent_users = User.objects.order_by('-date_joined')[:5]
+    
+    # All facilities for management
+    all_facilities = Facility.objects.all().order_by('facility_name')
+    
+    context = {
+        'total_facilities': total_facilities,
+        'total_courts': total_courts,
+        'total_bookings': total_bookings,
+        'active_bookings': active_bookings,
+        'total_users': total_users,
+        'recent_announcements': recent_announcements,
+        'recent_bookings': recent_bookings,
+        'recent_users': recent_users,
+        'all_facilities': all_facilities,
+    }
+    
+    return render(request, 'admin/dashboard.html', context)
 
 
 # Cancel booking - POST only

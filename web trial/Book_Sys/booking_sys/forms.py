@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from .models import (
     User, Student, Staff, Facility, Court, Slot, Booking, 
-    Blackout, Availability, Notification
+    Blackout, Availability, Notification, Announcement
 )
 from datetime import datetime, date, time
 import re
@@ -354,4 +354,29 @@ class NotificationForm(forms.ModelForm):
             'user': forms.Select(attrs={'class': 'form-control'}),
             'notif_text': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Notification message'}),
             'notif_channel': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+
+# Announcement Form
+class AnnouncementForm(forms.ModelForm):
+    title = forms.CharField(
+        max_length=200,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Announcement Title'})
+    )
+    
+    content = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 6, 'placeholder': 'Announcement content...'})
+    )
+    
+    class Meta:
+        model = Announcement
+        fields = ('title', 'content', 'priority', 'status', 'publish_date', 'expiry_date', 'is_featured')
+        widgets = {
+            'priority': forms.Select(attrs={'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-control'}),
+            'publish_date': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'expiry_date': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'is_featured': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }

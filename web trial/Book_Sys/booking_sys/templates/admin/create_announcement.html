@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Create Announcement{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div style="max-width: 700px; margin: 0 auto;">
+    <div class="card-section">
+      <h1 style="margin-top: 0;">Create New Announcement</h1>
+      
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }}" style="padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 8px; background: {% if message.tags == 'error' %}#fee2e2; color: #b91c1c;{% elif message.tags == 'success' %}#d1fae5; color: #065f46;{% else %}#dbeafe; color: #1e40af;{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+      
+      <form method="post">
+        {% csrf_token %}
+        
+        <label class="form-label">Title *</label>
+        {{ form.title }}
+        {% if form.title.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.title.errors }}</div>
+        {% endif %}
+        
+        <label class="form-label">Content *</label>
+        {{ form.content }}
+        {% if form.content.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.content.errors }}</div>
+        {% endif %}
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Enter the full announcement text. This will be displayed to all users.</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+          <div>
+            <label class="form-label">Priority</label>
+            {{ form.priority }}
+            {% if form.priority.errors %}
+              <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.priority.errors }}</div>
+            {% endif %}
+          </div>
+          
+          <div>
+            <label class="form-label">Status</label>
+            {{ form.status }}
+            {% if form.status.errors %}
+              <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.status.errors }}</div>
+            {% endif %}
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+          <div>
+            <label class="form-label">Publish Date (Optional)</label>
+            {{ form.publish_date }}
+            {% if form.publish_date.errors %}
+              <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.publish_date.errors }}</div>
+            {% endif %}
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Schedule when to publish this announcement</p>
+          </div>
+          
+          <div>
+            <label class="form-label">Expiry Date (Optional)</label>
+            {{ form.expiry_date }}
+            {% if form.expiry_date.errors %}
+              <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.expiry_date.errors }}</div>
+            {% endif %}
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">When this announcement should expire</p>
+          </div>
+        </div>
+        
+        <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+          {{ form.is_featured }}
+          <label for="{{ form.is_featured.id_for_label }}" style="margin: 0; font-weight: 500;">Feature this announcement on the homepage</label>
+        </div>
+        {% if form.is_featured.errors %}
+          <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ form.is_featured.errors }}</div>
+        {% endif %}
+        
+        {% if form.non_field_errors %}
+          <div style="margin-top: 1rem; padding: 0.75rem; background: #fee2e2; color: #b91c1c; border-radius: 8px; font-size: 0.9rem;">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+        
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
+          <button type="submit" class="btn btn-primary">Create Announcement</button>
+          <a href="{% url 'booking_sys:admin_dashboard' %}" class="btn btn-outline">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}
+

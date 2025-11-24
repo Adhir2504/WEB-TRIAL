@@ -28,7 +28,7 @@
           <a href="{% url 'booking_sys:profile' %}" class="nav-link">Profile</a>
         {% endif %}
         {% if user.is_staff or user.member_type == 'admin' %}
-          <a href="{% url 'booking_sys:create_facility' %}" class="nav-link">Admin</a>
+          <a href="{% url 'booking_sys:admin_dashboard' %}" class="nav-link">Admin</a>
         {% endif %}
       </nav>
     </div>

@@ -327,3 +327,68 @@ class AuditLog(models.Model):
             user_involved=user,
             entry_desc=description
         )
+
+
+class Announcement(models.Model):
+    """Site-wide announcements that can be displayed on the homepage and other pages"""
+    PRIORITY_LEVELS = [
+        ('low', 'Low'),
+        ('normal', 'Normal'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('published', 'Published'),
+        ('archived', 'Archived'),
+    ]
+    
+    announcement_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    priority = models.CharField(max_length=10, choices=PRIORITY_LEVELS, default='normal')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='announcements_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    publish_date = models.DateTimeField(null=True, blank=True, help_text="When to publish this announcement")
+    expiry_date = models.DateTimeField(null=True, blank=True, help_text="When this announcement should expire")
+    is_featured = models.BooleanField(default=False, help_text="Show on homepage prominently")
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Announcement'
+        verbose_name_plural = 'Announcements'
+    
+    def __str__(self):
+        return f"{self.title} ({self.get_status_display()})"
+    
+    def is_active(self):
+        """Check if announcement is currently active"""
+        from django.utils import timezone
+        now = timezone.now()
+        
+        if self.status != 'published':
+            return False
+        
+        if self.publish_date and self.publish_date > now:
+            return False
+        
+        if self.expiry_date and self.expiry_date < now:
+            return False
+        
+        return True
+    
+    def publish(self):
+        """Publish the announcement"""
+        from django.utils import timezone
+        self.status = 'published'
+        if not self.publish_date:
+            self.publish_date = timezone.now()
+        self.save()
+    
+    def archive(self):
+        """Archive the announcement"""
+        self.status = 'archived'
+        self.save()
