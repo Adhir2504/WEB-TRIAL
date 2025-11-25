@@ -188,15 +188,21 @@ body {
 /* HERO */
 
 .hero {
-  border-radius: 20px;
-  background: linear-gradient(120deg, #1d4ed8, #0f766e);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 3rem 3.5rem;
+  border-radius: 24px;
+
+  /* 🔽 background image here */
+  background-image: url("images/homePage.jpg");  /* or "images/homePage.jpg" */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
   color: #ffffff;
-  padding: 2.5rem;
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 2rem;
-  box-shadow: var(--shadow-soft);
 }
+
 
 .hero-tag {
   text-transform: uppercase;
