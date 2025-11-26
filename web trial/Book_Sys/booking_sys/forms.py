@@ -176,10 +176,17 @@ class FacilityForm(forms.ModelForm):
         ],
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Location'})
     )
+    image_url = forms.URLField(
+        required=False,
+        widget=forms.URLInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Image URL (optional)'
+        })
+    )
     
     class Meta:
         model = Facility
-        fields = ('facility_name', 'facility_type', 'location', 'description', 'facility_status')
+        fields = ('facility_name', 'facility_type', 'location', 'description', 'facility_status','image_url')
         widgets = {
             'facility_type': forms.Select(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Description'}),

@@ -89,6 +89,7 @@ class Facility(models.Model):
     facility_type = models.CharField(max_length=20, choices=FACILITY_TYPES)
     location = models.CharField(max_length=300)
     description = models.TextField(blank=True)
+    image_url = models.URLField(blank=True, null=True)
     facility_status = models.CharField(max_length=20, choices=FACILITY_STATUS, default='available')
     
     def __str__(self):

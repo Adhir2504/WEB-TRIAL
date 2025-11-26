@@ -51,7 +51,13 @@
         {% with facility=item.facility next_slot=item.next_slot capacity=item.capacity %}
           <article class="facility-card">
             <div class="facility-image-wrapper">
-              <div class="facility-image {{ facility.facility_type }}-bg"></div>
+              {% if facility.image_url %}
+                <img src="{{ facility.image_url }}"
+                     alt="{{ facility.facility_name }}"
+                     class="facility-card-image">
+              {% else %}
+                <div class="facility-image {{ facility.facility_type }}-bg"></div>
+              {% endif %}
               <div class="facility-badge-overlay">
                 {% if facility.facility_status == 'available' %}
                   <span class="badge badge-available">Available</span>
@@ -128,7 +134,13 @@
     background-size: cover;
     background-position: center;
   }
-  
+  /* NEW: actual image styling */
+  .facility-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
   .facility-badge-overlay {
     position: absolute;
     top: 0.75rem;

@@ -268,6 +268,17 @@ body {
   background-size: cover;
   background-position: center;
 }
+.facility-hero-image {
+  position: relative;
+  overflow: hidden;
+}
+
+.facility-hero-photo {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
 
 /* Fake backgrounds – replace with real images if you want */
 .futsal-bg { background-image: radial-gradient(circle at top left, #1d4ed8, #0f172a); }

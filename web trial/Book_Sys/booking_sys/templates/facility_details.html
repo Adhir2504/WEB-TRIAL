@@ -5,7 +5,13 @@
 {% block content %}
 <section class="section facility-detail">
   <div class="facility-main">
-    <div class="facility-hero-image {{ facility.facility_type }}-bg large"></div>
+    <div class="facility-hero-image large {% if not facility.image_url %}{{ facility.facility_type }}-bg{% endif %}">
+      {% if facility.image_url %}
+        <img src="{{ facility.image_url }}"
+             alt="{{ facility.facility_name }}"
+             class="facility-hero-photo">
+      {% endif %}
+    </div>
 
     <div class="facility-info-card">
       <h1>{{ facility.facility_name }}</h1>
