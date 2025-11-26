@@ -7,7 +7,6 @@ urlpatterns = [
     path('facilities/', views.facilities, name='facilities'),
     path('facility/<slug:slug>/', views.facility_detail, name='facility_detail'),
     path('facility/<slug:slug>/courts/', views.facility_courts, name='facility_courts'),
-    path('calendar/', views.calendar_view, name='calendar'),
     path('search/', views.search_facilities, name='search_facilities'),
     
     # Authentication (GET and POST)
@@ -32,4 +31,9 @@ urlpatterns = [
     path('manage/blackout/create/', views.create_blackout, name='create_blackout'),
     path('manage/availability/create/', views.create_availability, name='create_availability'),
     path('manage/announcement/create/', views.create_announcement, name='create_announcement'),
+    
+    # API endpoints for calendar booking
+    path('api/facility/<uuid:facility_id>/slots/', views.api_get_available_slots, name='api_get_slots'),
+    path('api/booking/create/', views.api_create_booking, name='api_create_booking'),
+    path('api/facility/<uuid:facility_id>/user-status/', views.api_user_booking_status, name='api_user_status'),
 ]

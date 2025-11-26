@@ -23,7 +23,6 @@
       <nav class="nav-links">
         <a href="{% url 'booking_sys:home' %}" class="nav-link">Home</a>
         <a href="{% url 'booking_sys:facilities' %}" class="nav-link">Facilities</a>
-        <a href="{% url 'booking_sys:calendar' %}" class="nav-link">Calendar</a>
         {% if user.is_authenticated %}
           <a href="{% url 'booking_sys:profile' %}" class="nav-link">Profile</a>
         {% endif %}
@@ -78,5 +77,8 @@
       </div>
     </div>
   </footer>
+
+  <!-- Optional per-page extra scripts -->
+  {% block extra_scripts %}{% endblock %}
 </body>
 </html>

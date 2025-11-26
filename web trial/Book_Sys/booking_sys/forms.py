@@ -222,10 +222,11 @@ class CourtForm(forms.ModelForm):
     
     class Meta:
         model = Court
-        fields = ('facility', 'court_name', 'sport_type', 'capacity', 'notes', 'court_status')
+        fields = ('facility', 'court_name', 'sport_type', 'capacity', 'image_url', 'notes', 'court_status')
         widgets = {
             'facility': forms.Select(attrs={'class': 'form-control'}),
             'capacity': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Capacity'}),
+            'image_url': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'Image URL (e.g., https://example.com/image.jpg)'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Notes'}),
             'court_status': forms.Select(attrs={'class': 'form-control'}),
         }

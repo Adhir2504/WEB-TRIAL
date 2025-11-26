@@ -4,9 +4,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.contrib.auth.forms import AuthenticationForm
 from django.db import models
+from datetime import datetime, timedelta, date
+import json
 from .models import (
     User, Student, Staff, Facility, Court, Slot, Booking, 
     Blackout, Availability, Notification, Announcement
@@ -23,7 +26,7 @@ def home(request):
     """Home page view - displays welcome page"""
     from django.utils import timezone
     
-    facilities = Facility.objects.filter(facility_status='available')[:6]
+    facilities = Facility.objects.filter(facility_status='available').order_by('-likes_count')[:3]
     
     # Get active announcements
     now = timezone.now()
@@ -101,156 +104,84 @@ def facility_detail(request, slug):
 @login_required
 @require_http_methods(["GET"])
 def facility_courts(request, slug):
-    """Display courts and available slots for a facility, grouped per court"""
+    """Display courts for a facility with available slots for selected date"""
     facility = get_object_or_404(Facility, facility_name__icontains=slug.replace('-', ' '))
-    courts = Court.objects.filter(facility=facility, court_status='available').order_by('court_name')
-
-    # Get available slots for all courts in this facility
-    slots = Slot.objects.filter(
-        court__facility=facility,
-        slot_status='available'
-    ).select_related('court').order_by('day_of_week', 'start_time')
-
-    # Group slots by court
-    slots_by_court = {}
-    for slot in slots:
-        slots_by_court.setdefault(slot.court_id, []).append(slot)
-
+    
+    # Get date from query parameter
+    date_str = request.GET.get('date')
+    selected_date = None
     court_data = []
-    for court in courts:
-        court_data.append({
-            'court': court,
-            'slots': slots_by_court.get(court.court_id, []),
-        })
-
-    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-
+    
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            
+            # Check if date is in the past
+            if selected_date < timezone.localdate():
+                messages.warning(request, 'Cannot view slots for past dates.')
+                selected_date = None
+            else:
+                # Get all available courts for this facility
+                courts = Court.objects.filter(facility=facility, court_status='available').order_by('court_name')
+                
+                # Get day of week for the selected date
+                day_of_week = selected_date.weekday()
+                
+                for court in courts:
+                    # Check if court is available on this day
+                    try:
+                        availability = Availability.objects.get(court=court, day_of_week=day_of_week)
+                    except Availability.DoesNotExist:
+                        continue
+                    
+                    # Get slots for this court and day
+                    slots = Slot.objects.filter(
+                        court=court,
+                        day_of_week=day_of_week,
+                        slot_status='available'
+                    ).order_by('start_time')
+                    
+                    # Check which slots are actually available (not booked)
+                    available_slots = []
+                    for slot in slots:
+                        is_available = Booking.is_slot_available(
+                            court, selected_date, slot.start_time, slot.end_time
+                        )
+                        if is_available:
+                            available_slots.append(slot)
+                    
+                    if available_slots:
+                        court_data.append({
+                            'court': court,
+                            'slots': available_slots,
+                            'slot_count': len(available_slots),
+                        })
+        except ValueError:
+            messages.error(request, 'Invalid date format.')
+            selected_date = None
+    
+    # Get user's booking status if logged in
+    user_booking_status = None
+    if request.user.is_authenticated and selected_date:
+        weekly_bookings = Booking.get_user_weekly_bookings(request.user, facility, selected_date)
+        monthly_bookings = Booking.get_user_monthly_bookings(request.user, facility, selected_date)
+        user_booking_status = {
+            'weekly_count': weekly_bookings.count(),
+            'monthly_count': monthly_bookings.count(),
+            'weekly_limit': 1,
+            'monthly_limit': 4,
+            'can_book_this_week': weekly_bookings.count() < 1,
+            'can_book_this_month': monthly_bookings.count() < 4,
+        }
+    
     return render(request, 'facility_courts.html', {
         'facility': facility,
         'court_data': court_data,
-        'day_names': day_names,
+        'selected_date': selected_date,
+        'date_str': date_str,
+        'today': timezone.localdate(),
+        'user_booking_status': user_booking_status,
     })
-
-
-# Calendar view - GET only
-@require_http_methods(["GET"])
-def calendar_view(request):
-    """Display interactive calendar view"""
-    from calendar import monthcalendar, month_name
-    from datetime import date
-    
-    courts = Court.objects.filter(court_status='available')
-
-    # Get user's bookings if logged in
-    user_bookings = []
-    if request.user.is_authenticated:
-        user_bookings = Booking.objects.filter(user=request.user, fulfilled='no').order_by('booking_date_time')[:10]
-
-    upcoming_bookings = Booking.objects.filter(fulfilled='no').select_related(
-        'slot__court__facility'
-    ).order_by('slot__day_of_week', 'slot__start_time')
-
-    selected_day_param = request.GET.get('day')
-    try:
-        selected_day = int(selected_day_param) if selected_day_param is not None else None
-        if selected_day is not None and selected_day not in range(7):
-            selected_day = None
-    except ValueError:
-        selected_day = None
-
-    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    calendar_days = []
-    for idx, name in enumerate(day_names):
-        day_bookings = [b for b in upcoming_bookings if b.slot.day_of_week == idx]
-        calendar_days.append({
-            'index': idx,
-            'name': name,
-            'bookings': day_bookings,
-            'count': len(day_bookings),
-            'is_selected': selected_day == idx
-        })
-
-    selected_index = 0
-    selected_day_bookings = []
-    selected_entry = None
-    if calendar_days:
-        if selected_day is not None:
-            selected_index = selected_day
-        else:
-            calendar_days[0]['is_selected'] = True
-        selected_entry = calendar_days[selected_index]
-        selected_day_bookings = selected_entry['bookings']
-
-    # Generate dynamic calendar grid
-    today = timezone.localdate()
-    current_year = today.year
-    current_month = today.month
-    current_day = today.day
-    
-    # Get calendar grid for current month
-    cal = monthcalendar(current_year, current_month)
-    
-    # Get previous and next month info
-    if current_month == 1:
-        prev_month = 12
-        prev_year = current_year - 1
-    else:
-        prev_month = current_month - 1
-        prev_year = current_year
-    
-    if current_month == 12:
-        next_month = 1
-        next_year = current_year + 1
-    else:
-        next_month = current_month + 1
-        next_year = current_year
-    
-    # Get days with bookings for highlighting
-    # Create a mapping of actual dates to whether they have events
-    # For simplicity, we'll check if any booking exists for each day of week
-    days_with_events = set()
-    for booking in upcoming_bookings:
-        days_with_events.add(booking.slot.day_of_week)
-    
-    # Create calendar weeks with proper formatting
-    calendar_weeks = []
-    for week in cal:
-        week_data = []
-        for day_index, day in enumerate(week):
-            if day == 0:
-                week_data.append({'day': None, 'is_today': False, 'has_event': False, 'is_current_month': False})
-            else:
-                is_today = (day == current_day)
-                # monthcalendar returns weeks starting Monday (index 0 = Monday)
-                # day_index: 0=Monday, 1=Tuesday, ..., 6=Sunday
-                # Our booking.slot.day_of_week: 0=Monday, 1=Tuesday, ..., 6=Sunday
-                has_event = day_index in days_with_events
-                week_data.append({
-                    'day': day,
-                    'is_today': is_today,
-                    'has_event': has_event,
-                    'is_current_month': True
-                })
-        calendar_weeks.append(week_data)
-
-    context = {
-        'courts': courts,
-        'user_bookings': user_bookings,
-        'upcoming_bookings': upcoming_bookings[:20],
-        'calendar_days': calendar_days,
-        'selected_day_bookings': selected_day_bookings,
-        'selected_day_index': selected_index,
-        'selected_day_entry': selected_entry,
-        'current_month_label': today.strftime('%B %Y'),
-        'calendar_weeks': calendar_weeks,
-        'current_year': current_year,
-        'current_month': current_month,
-        'prev_month': prev_month,
-        'prev_year': prev_year,
-        'next_month': next_month,
-        'next_year': next_year,
-    }
-    return render(request, 'calendar.html', context)
 
 
 # Profile view - GET and POST
@@ -282,7 +213,7 @@ def profile(request):
         elif user.member_type == 'staff':
             staff_form = StaffProfileForm()
         
-        bookings = Booking.objects.filter(user=user).order_by('-booking_date_time')[:10]
+        bookings = Booking.objects.filter(user=user).order_by('-booking_date', '-start_time')[:10]
         
         return render(request, 'profile.html', {
             'profile_form': profile_form,
@@ -358,23 +289,40 @@ def login_view(request):
         return render(request, 'registration/login.html', {'form': form})
     
     elif request.method == 'POST':
-        form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            username = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password')
-            user = authenticate(username=username, password=password)
-            if user is not None:
-                login(request, user)
-                messages.success(request, f'Welcome back, {user.first_name}!')
-                next_url = request.GET.get('next')
-                if next_url:
-                    return redirect(next_url)
-                return redirect('booking_sys:home')
-            else:
-                messages.error(request, 'Invalid username or password.')
-        else:
-            messages.error(request, 'Please correct the errors below.')
+        email = request.POST.get('email', '').strip()
+        password = request.POST.get('password', '')
         
+        if email and password:
+            # Authenticate using email (since USERNAME_FIELD is 'email')
+            user = authenticate(request, username=email, password=password)
+            
+            if user is not None:
+                if user.is_active:
+                    login(request, user)
+                    # Personalized welcome message based on time and user type
+                    from django.utils import timezone
+                    hour = timezone.localtime(timezone.now()).hour
+                    if hour < 12:
+                        greeting = "Good morning"
+                    elif hour < 18:
+                        greeting = "Good afternoon"
+                    else:
+                        greeting = "Good evening"
+                    
+                    messages.success(request, f'{greeting}, {user.first_name}! Welcome back to UniBook.')
+                    
+                    next_url = request.GET.get('next')
+                    if next_url:
+                        return redirect(next_url)
+                    return redirect('booking_sys:home')
+                else:
+                    messages.error(request, 'This account has been deactivated.')
+            else:
+                messages.error(request, 'Invalid email or password. Please try again.')
+        else:
+            messages.error(request, 'Please provide both email and password.')
+        
+        form = AuthenticationForm()
         return render(request, 'registration/login.html', {'form': form})
 
 
@@ -400,32 +348,56 @@ def register(request):
     elif request.method == 'POST':
         form = UserRegistrationForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            # Create profile based on member type
-            member_type = form.cleaned_data.get('member_type')
-            if member_type == 'student':
-                student_id = request.POST.get('student_id', '').strip().upper()
-                if student_id:
-                    Student.objects.create(user=user, student_id=student_id)
+            try:
+                user = form.save()
+                # Create profile based on member type
+                member_type = form.cleaned_data.get('member_type')
+                profile_created = False
+                
+                if member_type == 'student':
+                    student_id = request.POST.get('student_id', '').strip().upper()
+                    if student_id:
+                        Student.objects.create(user=user, student_id=student_id)
+                        profile_created = True
+                elif member_type == 'staff':
+                    department = request.POST.get('department', '').strip()
+                    if department:
+                        Staff.objects.create(user=user, department=department)
+                        profile_created = True
+                
+                # Auto-login after registration
+                # Use the raw password before it was hashed
+                raw_password = form.cleaned_data.get('password1')
+                # Authenticate using the username
+                authenticated_user = authenticate(request, username=user.username, password=raw_password)
+                
+                if authenticated_user is not None:
+                    login(request, authenticated_user)
+                    # Welcome message with next steps
+                    welcome_msg = f'🎉 Welcome to UniBook, {user.first_name}! Your account has been created successfully.'
+                    messages.success(request, welcome_msg)
+                    
+                    if not profile_created and member_type != 'admin':
+                        messages.info(request, 'Complete your profile to unlock all features.')
+                    else:
+                        messages.info(request, 'You can now browse facilities and make bookings.')
+                    
+                    return redirect('booking_sys:home')
                 else:
-                    messages.warning(request, 'Student ID not provided. You can add it later in your profile.')
-            elif member_type == 'staff':
-                department = request.POST.get('department', '').strip()
-                if department:
-                    Staff.objects.create(user=user, department=department)
-                else:
-                    messages.warning(request, 'Department not provided. You can add it later in your profile.')
-            
-            # Auto-login after registration
-            username = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password1')
-            user = authenticate(username=username, password=password)
-            if user:
-                login(request, user)
-                messages.success(request, f'Welcome {user.first_name}! Registration successful.')
-                return redirect('booking_sys:home')
+                    # If auto-login fails, still redirect to login but with success message
+                    messages.success(request, f'Account created successfully! Please log in with your credentials.')
+                    return redirect('booking_sys:login')
+            except Exception as e:
+                messages.error(request, f'An error occurred during registration: {str(e)}')
         else:
-            messages.error(request, 'Please correct the errors below.')
+            # Display specific validation errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    if field == '__all__':
+                        messages.error(request, error)
+                    else:
+                        field_name = form.fields[field].label if field in form.fields else field
+                        messages.error(request, f'{field_name}: {error}')
         
         return render(request, 'registration/register.html', {'form': form})
 
@@ -581,7 +553,7 @@ def create_slot(request):
         if form.is_valid():
             slot = form.save()
             messages.success(request, 'Slot created successfully!')
-            return redirect('booking_sys:calendar')
+            return redirect('booking_sys:admin_dashboard')
         else:
             messages.error(request, 'Please correct the errors below.')
             return render(request, 'admin/create_slot.html', {'form': form})
@@ -605,7 +577,7 @@ def create_blackout(request):
         if form.is_valid():
             blackout = form.save()
             messages.success(request, 'Blackout period created successfully!')
-            return redirect('booking_sys:calendar')
+            return redirect('booking_sys:admin_dashboard')
         else:
             messages.error(request, 'Please correct the errors below.')
             return render(request, 'admin/create_blackout.html', {'form': form})
@@ -629,7 +601,7 @@ def create_availability(request):
         if form.is_valid():
             availability = form.save()
             messages.success(request, 'Availability schedule created successfully!')
-            return redirect('booking_sys:calendar')
+            return redirect('booking_sys:admin_dashboard')
         else:
             messages.error(request, 'Please correct the errors below.')
             return render(request, 'admin/create_availability.html', {'form': form})
@@ -677,12 +649,12 @@ def admin_dashboard(request):
     total_facilities = Facility.objects.count()
     total_courts = Court.objects.count()
     total_bookings = Booking.objects.count()
-    active_bookings = Booking.objects.filter(fulfilled='no').count()
+    active_bookings = Booking.objects.filter(status__in=['pending', 'confirmed']).count()
     total_users = User.objects.count()
     recent_announcements = Announcement.objects.filter(status='published').order_by('-created_at')[:5]
     
     # Recent activity
-    recent_bookings = Booking.objects.order_by('-booking_date_time')[:10]
+    recent_bookings = Booking.objects.order_by('-created_at')[:10]
     recent_users = User.objects.order_by('-date_joined')[:5]
     
     # All facilities for management
@@ -771,3 +743,202 @@ def search_facilities(request):
         'query': query,
         'selected_type': facility_type
     })
+
+
+# API endpoint to get available slots for a specific date and facility
+@login_required
+@require_http_methods(["GET"])
+def api_get_available_slots(request, facility_id):
+    """API endpoint to get available slots for a specific date and facility"""
+    try:
+        facility = get_object_or_404(Facility, facility_id=facility_id)
+        date_str = request.GET.get('date')
+        
+        if not date_str:
+            return JsonResponse({'error': 'Date parameter is required'}, status=400)
+        
+        try:
+            booking_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=400)
+        
+        # Check if date is in the past
+        if booking_date < timezone.localdate():
+            return JsonResponse({'error': 'Cannot book for past dates'}, status=400)
+        
+        # Check user's booking eligibility for this facility
+        can_book, message = Booking.can_user_book(request.user, facility, booking_date)
+        
+        # Get all courts for this facility
+        courts = Court.objects.filter(facility=facility, court_status='available')
+        
+        courts_data = []
+        for court in courts:
+            # Get day of week (0=Monday, 6=Sunday)
+            day_of_week = booking_date.weekday()
+            
+            # Get availability for this day
+            try:
+                availability = Availability.objects.get(court=court, day_of_week=day_of_week)
+            except Availability.DoesNotExist:
+                continue  # Court not available on this day
+            
+            # Get slots for this court and day
+            slots = Slot.objects.filter(
+                court=court,
+                day_of_week=day_of_week,
+                slot_status='available'
+            ).order_by('start_time')
+            
+            # Check which slots are actually available (not booked)
+            available_slots = []
+            for slot in slots:
+                is_available = Booking.is_slot_available(
+                    court, booking_date, slot.start_time, slot.end_time
+                )
+                if is_available:
+                    available_slots.append({
+                        'slot_id': str(slot.slot_id),
+                        'start_time': slot.start_time.strftime('%H:%M'),
+                        'end_time': slot.end_time.strftime('%H:%M'),
+                        'start_time_display': slot.start_time.strftime('%I:%M %p'),
+                        'end_time_display': slot.end_time.strftime('%I:%M %p'),
+                        'slot_type': slot.get_slot_type_display(),
+                    })
+            
+            if available_slots:
+                courts_data.append({
+                    'court_id': str(court.court_id),
+                    'court_name': court.court_name,
+                    'sport_type': court.sport_type,
+                    'capacity': court.capacity,
+                    'notes': court.notes,
+                    'image_url': court.image_url,
+                    'slots': available_slots
+                })
+        
+        return JsonResponse({
+            'can_book': can_book,
+            'message': message,
+            'courts': courts_data,
+            'date': date_str,
+            'facility_name': facility.facility_name
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# API endpoint to create a booking
+@login_required
+@require_http_methods(["POST"])
+def api_create_booking(request):
+    """API endpoint to create a booking"""
+    try:
+        data = json.loads(request.body)
+        
+        facility_id = data.get('facility_id')
+        court_id = data.get('court_id')
+        booking_date_str = data.get('booking_date')
+        start_time_str = data.get('start_time')
+        end_time_str = data.get('end_time')
+        notes = data.get('notes', '')
+        
+        # Validate required fields
+        if not all([facility_id, court_id, booking_date_str, start_time_str, end_time_str]):
+            return JsonResponse({'error': 'Missing required fields'}, status=400)
+        
+        # Get models
+        facility = get_object_or_404(Facility, facility_id=facility_id)
+        court = get_object_or_404(Court, court_id=court_id)
+        
+        # Parse date and times
+        try:
+            booking_date = datetime.strptime(booking_date_str, '%Y-%m-%d').date()
+            start_time = datetime.strptime(start_time_str, '%H:%M').time()
+            end_time = datetime.strptime(end_time_str, '%H:%M').time()
+        except ValueError as e:
+            return JsonResponse({'error': f'Invalid date/time format: {str(e)}'}, status=400)
+        
+        # Check if slot is still available
+        if not Booking.is_slot_available(court, booking_date, start_time, end_time):
+            return JsonResponse({'error': 'This time slot has already been booked'}, status=400)
+        
+        # Check weekly limit (1 booking per facility per week)
+        weekly_bookings = Booking.get_user_weekly_bookings(request.user, facility, booking_date)
+        if weekly_bookings.count() >= 1:
+            return JsonResponse({
+                'error': 'You have already booked this facility once this week. You can only book 1 time per facility per week.'
+            }, status=400)
+        
+        # Check monthly limit (4 bookings per facility per month)
+        monthly_bookings = Booking.get_user_monthly_bookings(request.user, facility, booking_date)
+        if monthly_bookings.count() >= 4:
+            return JsonResponse({
+                'error': 'You have reached the monthly limit for this facility. You can only book 4 times per facility per month.'
+            }, status=400)
+        
+        # Create booking
+        booking = Booking.objects.create(
+            user=request.user,
+            facility=facility,
+            court=court,
+            booking_date=booking_date,
+            start_time=start_time,
+            end_time=end_time,
+            notes=notes,
+            status='confirmed'
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Booking created successfully!',
+            'booking_id': str(booking.booking_id),
+            'booking': {
+                'facility': facility.facility_name,
+                'court': court.court_name,
+                'date': booking_date.strftime('%Y-%m-%d'),
+                'time': f"{start_time.strftime('%I:%M %p')} - {end_time.strftime('%I:%M %p')}"
+            }
+        })
+        
+    except ValidationError as e:
+        return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# API endpoint to check user's booking status
+@login_required
+@require_http_methods(["GET"])
+def api_user_booking_status(request, facility_id):
+    """Get user's booking status for a facility"""
+    try:
+        facility = get_object_or_404(Facility, facility_id=facility_id)
+        target_date_str = request.GET.get('date')
+        
+        if not target_date_str:
+            target_date = timezone.localdate()
+        else:
+            try:
+                target_date = datetime.strptime(target_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({'error': 'Invalid date format'}, status=400)
+        
+        # Get weekly bookings
+        weekly_bookings = Booking.get_user_weekly_bookings(request.user, facility, target_date)
+        
+        # Get monthly bookings
+        monthly_bookings = Booking.get_user_monthly_bookings(request.user, facility, target_date)
+        
+        return JsonResponse({
+            'weekly_bookings': weekly_bookings.count(),
+            'monthly_bookings': monthly_bookings.count(),
+            'weekly_limit': 1,
+            'monthly_limit': 4,
+            'can_book_this_week': weekly_bookings.count() < 1,
+            'can_book_this_month': monthly_bookings.count() < 4,
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

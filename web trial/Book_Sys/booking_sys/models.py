@@ -3,8 +3,10 @@ from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
 from django.utils.timezone import make_aware
-from datetime import datetime
+from datetime import datetime, timedelta, date
+from django.utils import timezone
 import uuid
+import calendar
 
 class User(AbstractUser):
     MEMBER_TYPES = [
@@ -91,6 +93,7 @@ class Facility(models.Model):
     description = models.TextField(blank=True)
     image_url = models.URLField(blank=True, null=True)
     facility_status = models.CharField(max_length=20, choices=FACILITY_STATUS, default='available')
+    likes_count = models.PositiveIntegerField(default=0)
     
     def __str__(self):
         return self.facility_name
@@ -112,6 +115,7 @@ class Court(models.Model):
     sport_type = models.CharField(max_length=100)
     capacity = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(1000)])
     notes = models.TextField(blank=True, default="None")
+    image_url = models.URLField(blank=True, null=True)
     court_status = models.CharField(max_length=20, choices=COURT_STATUS, default='available')
     
     def __str__(self):
@@ -230,37 +234,174 @@ class Slot(models.Model):
 
 class Booking(models.Model):
     FULFILLMENT_STATUS = [
-        ('no', 'No'),
-        ('yes', 'Yes'),
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
         ('cancelled', 'Cancelled'),
+        ('completed', 'Completed'),
     ]
     
     booking_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
-    slot = models.ForeignKey(Slot, on_delete=models.CASCADE, related_name='bookings')
-    booking_date_time = models.DateTimeField(auto_now_add=True)
-    notes = models.TextField(blank=True, default="None")
-    fulfilled = models.CharField(max_length=10, choices=FULFILLMENT_STATUS, default='no')
+    facility = models.ForeignKey('Facility', on_delete=models.CASCADE, related_name='bookings')
+    court = models.ForeignKey('Court', on_delete=models.CASCADE, related_name='bookings')
+    
+    # Actual booking date (not when the booking was made)
+    booking_date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    
+    # When the booking was created
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    notes = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=10, choices=FULFILLMENT_STATUS, default='confirmed')
+    
+    # Reference to slot template (optional, for tracking which slot pattern was used)
+    slot = models.ForeignKey('Slot', on_delete=models.SET_NULL, null=True, blank=True, related_name='date_bookings')
     
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['slot'], name='unique_slot_booking')
+            models.UniqueConstraint(
+                fields=['court', 'booking_date', 'start_time'], 
+                name='unique_court_date_time_booking'
+            )
+        ]
+        ordering = ['booking_date', 'start_time']
+        indexes = [
+            models.Index(fields=['user', 'booking_date']),
+            models.Index(fields=['facility', 'booking_date']),
+            models.Index(fields=['court', 'booking_date']),
         ]
     
     def __str__(self):
-        return f"Booking {self.booking_id} - {self.user.first_name}"
+        return f"{self.user.username} - {self.court.court_name} on {self.booking_date} at {self.start_time}"
     
-    def fulfill_booking(self):
-        self.fulfilled = 'yes'
-        self.save()
+    def clean(self):
+        """Validate booking constraints"""
+        # Check if booking date is in the past
+        if self.booking_date < timezone.localdate():
+            raise ValidationError("Cannot book for past dates.")
+        
+        # Check if user has already booked this facility this week
+        if not self.pk:  # Only check for new bookings
+            # Get week boundaries
+            week_start = self.booking_date - timedelta(days=self.booking_date.weekday())
+            week_end = week_start + timedelta(days=6)
+            
+            # Check weekly limit (1 booking per week per facility)
+            weekly_bookings = Booking.objects.filter(
+                user=self.user,
+                facility=self.facility,
+                booking_date__gte=week_start,
+                booking_date__lte=week_end,
+                status__in=['pending', 'confirmed']
+            ).exclude(pk=self.pk if self.pk else None)
+            
+            if weekly_bookings.exists():
+                raise ValidationError(
+                    f"You can only book {self.facility.facility_name} once per week. "
+                    f"You already have a booking for this week."
+                )
+            
+            # Check monthly limit (4 bookings per month per facility)
+            month_start = self.booking_date.replace(day=1)
+            if self.booking_date.month == 12:
+                month_end = date(self.booking_date.year + 1, 1, 1) - timedelta(days=1)
+            else:
+                month_end = date(self.booking_date.year, self.booking_date.month + 1, 1) - timedelta(days=1)
+            
+            monthly_bookings = Booking.objects.filter(
+                user=self.user,
+                facility=self.facility,
+                booking_date__gte=month_start,
+                booking_date__lte=month_end,
+                status__in=['pending', 'confirmed']
+            ).exclude(pk=self.pk if self.pk else None)
+            
+            if monthly_bookings.count() >= 4:
+                raise ValidationError(
+                    f"You can only book {self.facility.facility_name} 4 times per month. "
+                    f"You have reached your monthly limit."
+                )
+        
+        # Validate time slot
+        if self.start_time >= self.end_time:
+            raise ValidationError("Start time must be earlier than end time.")
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
     
     def cancel_booking(self):
-        self.fulfilled = 'cancelled'
+        """Cancel the booking"""
+        self.status = 'cancelled'
         self.save()
-
-        still_booked = self.slot.bookings.filter(fulfilled='no').exists()
-        if not still_booked:
-            self.slot.change_status('available')
+    
+    def complete_booking(self):
+        """Mark booking as completed"""
+        self.status = 'completed'
+        self.save()
+    
+    @staticmethod
+    def get_user_weekly_bookings(user, facility, target_date):
+        """Get user's bookings for the week containing target_date"""
+        week_start = target_date - timedelta(days=target_date.weekday())
+        week_end = week_start + timedelta(days=6)
+        
+        return Booking.objects.filter(
+            user=user,
+            facility=facility,
+            booking_date__gte=week_start,
+            booking_date__lte=week_end,
+            status__in=['pending', 'confirmed']
+        )
+    
+    @staticmethod
+    def get_user_monthly_bookings(user, facility, target_date):
+        """Get user's bookings for the month containing target_date"""
+        month_start = target_date.replace(day=1)
+        if target_date.month == 12:
+            month_end = date(target_date.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            month_end = date(target_date.year, target_date.month + 1, 1) - timedelta(days=1)
+        
+        return Booking.objects.filter(
+            user=user,
+            facility=facility,
+            booking_date__gte=month_start,
+            booking_date__lte=month_end,
+            status__in=['pending', 'confirmed']
+        )
+    
+    @staticmethod
+    def can_user_book(user, facility, target_date):
+        """Check if user can book for the target date"""
+        # Check weekly limit
+        weekly_bookings = Booking.get_user_weekly_bookings(user, facility, target_date)
+        if weekly_bookings.exists():
+            return False, "You can only book this facility once per week."
+        
+        # Check monthly limit
+        monthly_bookings = Booking.get_user_monthly_bookings(user, facility, target_date)
+        if monthly_bookings.count() >= 4:
+            return False, "You have reached your monthly booking limit (4 bookings per month)."
+        
+        return True, "You can book this facility."
+    
+    @staticmethod
+    def is_slot_available(court, booking_date, start_time, end_time):
+        """Check if a time slot is available for booking"""
+        # Check for overlapping bookings
+        overlapping = Booking.objects.filter(
+            court=court,
+            booking_date=booking_date,
+            status__in=['pending', 'confirmed']
+        ).filter(
+            models.Q(start_time__lt=end_time) & models.Q(end_time__gt=start_time)
+        )
+        
+        return not overlapping.exists()
 
 class Blackout(models.Model):
     blackout_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

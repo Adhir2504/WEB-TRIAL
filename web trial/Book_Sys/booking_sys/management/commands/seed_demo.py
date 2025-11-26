@@ -1,7 +1,8 @@
-from datetime import time
+from datetime import time, date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from booking_sys.models import (
     Facility,
@@ -9,6 +10,7 @@ from booking_sys.models import (
     Slot,
     Availability,
     Booking,
+    Announcement,
 )
 
 
@@ -25,6 +27,7 @@ class Command(BaseCommand):
         facilities = self._create_facilities_with_courts()
         self._create_slots_for_facilities(facilities)
         self._create_sample_bookings(demo_student, facilities)
+        self._create_sample_announcements(demo_admin)
 
         self.stdout.write(self.style.SUCCESS("Demo data ready!"))
         self.stdout.write(self.style.NOTICE("You can log in with:"))
@@ -75,30 +78,35 @@ class Command(BaseCommand):
                 "type": "sports",
                 "location": "Gymnasium Complex",
                 "description": "Full-sized futsal court with digital scoreboards and spectator stands.",
+                "likes": 245,
             },
             {
                 "name": "Indoor Badminton Hub",
                 "type": "sports",
                 "location": "Sports Hall",
                 "description": "Four professional badminton courts with LED lighting and equipment rental.",
+                "likes": 189,
             },
             {
                 "name": "Campus Fitness Center",
                 "type": "recreation",
                 "location": "Wellness Building",
                 "description": "Weight machines, cardio zone, stretching studio and locker rooms.",
+                "likes": 312,
             },
             {
                 "name": "Outdoor Volleyball Courts",
                 "type": "sports",
                 "location": "Fields – Block B",
                 "description": "Two sand courts with lighting up to 10 PM and nearby seating.",
+                "likes": 156,
             },
             {
                 "name": "Basketball Pavilion",
                 "type": "sports",
                 "location": "Courtside Plaza",
                 "description": "Dual purpose indoor/outdoor pavilion with changing rooms.",
+                "likes": 201,
             },
         ]
 
@@ -111,28 +119,66 @@ class Command(BaseCommand):
                     "location": spec["location"],
                     "description": spec["description"],
                     "facility_status": "available",
+                    "likes_count": spec["likes"],
                 },
             )
-            facilities.append(facility)
-            if created:
+            # Update likes_count even if facility already exists
+            if not created:
+                facility.likes_count = spec["likes"]
+                facility.save(update_fields=['likes_count'])
+            else:
                 self.stdout.write(self.style.SUCCESS(f"• Created facility: {facility.facility_name}"))
-                self._create_default_courts(facility)
+            
+            # Always ensure courts exist for this facility
+            self._create_default_courts(facility)
+            facilities.append(facility)
         return facilities
 
     def _create_default_courts(self, facility: Facility):
+        # Court images mapped by sport type
+        court_images = {
+            "Futsal": [
+                "https://images.unsplash.com/photo-1589487391730-58f20eb2c308?w=800",
+                "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800",
+            ],
+            "Indoor": [
+                "https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?w=800",
+                "https://images.unsplash.com/photo-1593787157229-0b6b0c2846da?w=800",
+            ],
+            "Campus": [
+                "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800",
+                "https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=800",
+            ],
+            "Outdoor": [
+                "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=800",
+                "https://images.unsplash.com/photo-1593786481097-3b3b2f8b9cd9?w=800",
+            ],
+            "Basketball": [
+                "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800",
+                "https://images.unsplash.com/photo-1519861531473-9200262188bf?w=800",
+            ],
+        }
+        
+        sport_prefix = facility.facility_name.split()[0]
+        images = court_images.get(sport_prefix, [
+            "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800",
+            "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
+        ])
+        
         court_specs = [
-            ("Court A", "Main court", 12),
-            ("Court B", "Practice court", 10),
+            ("Court A", "Main competition court with professional equipment and seating", 12, images[0]),
+            ("Court B", "Practice court with training facilities and storage", 10, images[1] if len(images) > 1 else images[0]),
         ]
 
-        for name_suffix, notes, capacity in court_specs:
+        for name_suffix, notes, capacity, image_url in court_specs:
             Court.objects.get_or_create(
                 facility=facility,
-                court_name=f"{facility.facility_name.split()[0]} {name_suffix}",
+                court_name=f"{sport_prefix} {name_suffix}",
                 defaults={
-                    "sport_type": facility.facility_name.split()[0],
+                    "sport_type": sport_prefix,
                     "capacity": capacity,
                     "notes": notes,
+                    "image_url": image_url,
                 },
             )
 
@@ -165,15 +211,90 @@ class Command(BaseCommand):
                         )
 
     def _create_sample_bookings(self, user, facilities):
+        """Create sample bookings for next week"""
         if Booking.objects.exists():
             return
-        available_slots = Slot.objects.filter(slot_status="available")[:5]
-        for slot in available_slots:
-            Booking.objects.create(
-                user=user,
-                slot=slot,
-                notes=f"Demo booking for {slot.court.court_name}",
+        
+        today = timezone.localdate()
+        # Create bookings for next week (avoiding current week restriction)
+        next_week_start = today + timedelta(days=7)
+        
+        # Create a few sample bookings
+        booking_dates = [
+            next_week_start,  # Monday next week
+            next_week_start + timedelta(days=3),  # Thursday next week
+        ]
+        
+        for facility in facilities[:2]:  # Just first 2 facilities
+            courts = list(facility.courts.all())
+            if not courts:
+                continue
+                
+            court = courts[0]
+            booking_date = booking_dates.pop(0) if booking_dates else next_week_start
+            
+            # Create a booking for 10:30 - 12:30
+            try:
+                Booking.objects.create(
+                    user=user,
+                    facility=facility,
+                    court=court,
+                    booking_date=booking_date,
+                    start_time=time(10, 30),
+                    end_time=time(12, 30),
+                    notes=f"Demo booking for {court.court_name}",
+                    status='confirmed'
+                )
+                self.stdout.write(self.style.SUCCESS(f"• Created booking for {facility.facility_name} on {booking_date}"))
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(f"• Could not create booking: {e}"))
+
+    def _create_sample_announcements(self, admin_user):
+        """Create sample announcements"""
+        now = timezone.now()
+        
+        announcements_data = [
+            {
+                "title": "New Badminton Nets Installed",
+                "content": "We've upgraded all badminton courts with professional-grade nets. Enjoy your games with better quality equipment!",
+                "priority": "normal",
+                "is_featured": True,
+            },
+            {
+                "title": "Inter-Faculty Futsal League Starting Soon",
+                "content": "Registration opens next week for the annual inter-faculty futsal tournament. Check with your faculty sports coordinator for more details.",
+                "priority": "high",
+                "is_featured": True,
+                "expiry_date": now + timedelta(days=30),
+            },
+            {
+                "title": "Maintenance Schedule - Basketball Courts",
+                "content": "Basketball Pavilion will undergo maintenance from Dec 1-5. Please book alternative facilities during this period.",
+                "priority": "urgent",
+                "is_featured": False,
+                "expiry_date": now + timedelta(days=10),
+            },
+            {
+                "title": "Extended Hours During Exam Period",
+                "content": "All sports facilities will be open until 10 PM during the exam period to help students relax and destress.",
+                "priority": "normal",
+                "is_featured": False,
+            },
+        ]
+        
+        for ann_data in announcements_data:
+            announcement, created = Announcement.objects.get_or_create(
+                title=ann_data["title"],
+                defaults={
+                    "content": ann_data["content"],
+                    "priority": ann_data["priority"],
+                    "status": "published",
+                    "created_by": admin_user,
+                    "is_featured": ann_data.get("is_featured", False),
+                    "publish_date": now,
+                    "expiry_date": ann_data.get("expiry_date"),
+                }
             )
-            slot.change_status("booked")
-        self.stdout.write(self.style.SUCCESS("• Added demo bookings"))
+            if created:
+                self.stdout.write(self.style.SUCCESS(f"• Created announcement: {announcement.title}"))
 

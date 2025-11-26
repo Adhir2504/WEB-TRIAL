@@ -213,6 +213,9 @@ class CourtAdmin(admin.ModelAdmin):
         ('Basic Information', {
             'fields': ('court_id', 'facility', 'court_name', 'sport_type', 'capacity')
         }),
+        ('Media', {
+            'fields': ('image_url',)
+        }),
         ('Status', {
             'fields': ('court_status',)
         }),
@@ -370,24 +373,31 @@ class SlotAdmin(admin.ModelAdmin):
 # ==================== BOOKING ADMIN ====================
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ['booking_id_short', 'user_link', 'facility_court', 'booking_date', 'slot_time', 'fulfilled']
-    list_filter = ['fulfilled', 'booking_date_time', 'slot__court__facility']
-    search_fields = ['user__username', 'user__email', 'user__first_name', 'user__last_name', 'slot__court__court_name']
-    readonly_fields = ['booking_id', 'booking_date_time']
-    date_hierarchy = 'booking_date_time'
+    list_display = ['booking_id_short', 'user_link', 'facility_court', 'booking_date_display', 'time_slot', 'status']
+    list_filter = ['status', 'booking_date', 'facility']
+    search_fields = ['user__username', 'user__email', 'user__first_name', 'user__last_name', 'court__court_name', 'facility__facility_name']
+    readonly_fields = ['booking_id', 'created_at', 'updated_at']
+    date_hierarchy = 'booking_date'
     fieldsets = (
         ('Booking Information', {
-            'fields': ('booking_id', 'user', 'slot', 'booking_date_time')
+            'fields': ('booking_id', 'user', 'facility', 'court', 'slot')
+        }),
+        ('Date & Time', {
+            'fields': ('booking_date', 'start_time', 'end_time')
         }),
         ('Status', {
-            'fields': ('fulfilled',)
+            'fields': ('status',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
         }),
         ('Notes', {
             'fields': ('notes',)
         }),
     )
     
-    actions = ['mark_as_fulfilled', 'mark_as_cancelled']
+    actions = ['mark_as_confirmed', 'mark_as_completed', 'mark_as_cancelled']
     
     def booking_id_short(self, obj):
         return str(obj.booking_id)[:8] + '...'
@@ -399,23 +409,26 @@ class BookingAdmin(admin.ModelAdmin):
     user_link.short_description = 'User'
     
     def facility_court(self, obj):
-        return f"{obj.slot.court.facility.facility_name} - {obj.slot.court.court_name}"
+        return f"{obj.facility.facility_name} - {obj.court.court_name}"
     facility_court.short_description = 'Facility - Court'
     
-    def booking_date(self, obj):
-        return obj.booking_date_time.strftime('%Y-%m-%d %I:%M %p')
-    booking_date.short_description = 'Booking Date'
+    def booking_date_display(self, obj):
+        return obj.booking_date.strftime('%Y-%m-%d (%A)')
+    booking_date_display.short_description = 'Booking Date'
     
-    def slot_time(self, obj):
-        day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        day_name = day_names[obj.slot.day_of_week]
-        return f"{day_name} {obj.slot.start_time.strftime('%I:%M %p')} - {obj.slot.end_time.strftime('%I:%M %p')}"
-    slot_time.short_description = 'Slot Time'
+    def time_slot(self, obj):
+        return f"{obj.start_time.strftime('%I:%M %p')} - {obj.end_time.strftime('%I:%M %p')}"
+    time_slot.short_description = 'Time Slot'
     
-    def mark_as_fulfilled(self, request, queryset):
-        updated = queryset.update(fulfilled='yes')
-        self.message_user(request, f'{updated} booking(s) marked as fulfilled.')
-    mark_as_fulfilled.short_description = 'Mark selected bookings as fulfilled'
+    def mark_as_confirmed(self, request, queryset):
+        updated = queryset.update(status='confirmed')
+        self.message_user(request, f'{updated} booking(s) marked as confirmed.')
+    mark_as_confirmed.short_description = 'Mark selected bookings as confirmed'
+    
+    def mark_as_completed(self, request, queryset):
+        updated = queryset.update(status='completed')
+        self.message_user(request, f'{updated} booking(s) marked as completed.')
+    mark_as_completed.short_description = 'Mark selected bookings as completed'
     
     def mark_as_cancelled(self, request, queryset):
         for booking in queryset:

@@ -4,6 +4,29 @@
 
 {% block content %}
 
+<!-- Featured Announcements Banner -->
+<div id="announcementBanners">
+{% if announcements %}
+  {% for announcement in announcements %}
+    {% if announcement.is_featured %}
+      <div class="announcement-banner" style="background: {% if announcement.priority == 'urgent' %}#fee2e2; border-left: 4px solid #dc2626;{% elif announcement.priority == 'high' %}#fef3c7; border-left: 4px solid #f59e0b;{% else %}#dbeafe; border-left: 4px solid #3b82f6;{% endif %} padding: 1rem 1.5rem; margin-bottom: 1rem; transition: opacity 0.5s ease-out, transform 0.5s ease-out;">
+        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: start;">
+          <div>
+            <strong style="{% if announcement.priority == 'urgent' %}color: #dc2626;{% elif announcement.priority == 'high' %}color: #d97706;{% else %}color: #2563eb;{% endif %}">
+              {% if announcement.priority == 'urgent' %}🔴 URGENT: {% elif announcement.priority == 'high' %}⚠️ IMPORTANT: {% endif %}{{ announcement.title }}
+            </strong>
+            <p style="margin: 0.25rem 0 0 0; {% if announcement.priority == 'urgent' %}color: #7f1d1d;{% elif announcement.priority == 'high' %}color: #92400e;{% else %}color: #1e3a8a;{% endif %}">
+              {{ announcement.content }}
+            </p>
+          </div>
+          <button onclick="this.parentElement.parentElement.style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280; padding: 0; margin-left: 1rem; line-height: 1;">&times;</button>
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+</div>
+
 <!-- Hero / banner -->
 <section class="hero">
   <div class="hero-content">
@@ -24,8 +47,8 @@
 <!-- Overview of facilities / available slots -->
 <section class="section">
   <div class="section-header">
-    <h2>Overview of Facilities</h2>
-    <p>Check today’s availability and quickly book the slots you need.</p>
+    <h2>Top 3 Most Liked Facilities</h2>
+    <p>Check out the most popular facilities on campus and quickly book your slot.</p>
   </div>
 
   <div class="card-grid">
@@ -49,6 +72,7 @@
               {{ facility.description|default:"No description available."|truncatewords:15 }}
             </p>
             <ul class="facility-tags">
+              <li>❤️ {{ facility.likes_count }} likes</li>
               <li>{{ facility.get_facility_type_display }} facility</li>
               <li>{{ facility.get_facility_status_display }}</li>
             </ul>
@@ -133,14 +157,39 @@
 
     <article class="pill-card">
       <h3>Announcements</h3>
-      <ul class="updates-list">
-        <li>New badminton nets installed.</li>
-        <li>Inter-faculty futsal league starts next month.</li>
-        <li>Download the UniBook app for faster check-in.</li>
-      </ul>
-      <a href="{% url 'booking_sys:calendar' %}" class="btn btn-soft">View announcements</a>
+      {% if announcements %}
+        <ul class="updates-list">
+          {% for announcement in announcements %}
+            <li>
+              <strong>{% if announcement.priority == 'urgent' %}🔴 {% elif announcement.priority == 'high' %}⚠️ {% endif %}{{ announcement.title }}</strong>
+              <br><span style="color: var(--text-muted); font-size: 0.9rem;">{{ announcement.content|truncatewords:30 }}</span>
+              {% if announcement.expiry_date %}
+                <br><small style="color: var(--text-muted); font-size: 0.8rem;">Expires: {{ announcement.expiry_date|date:"M d, Y" }}</small>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p style="color: var(--text-muted);">No announcements at this time.</p>
+      {% endif %}
     </article>
   </div>
 </section>
+
+<script>
+// Auto-hide announcement banners after 15 seconds
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    const banners = document.querySelectorAll('.announcement-banner');
+    banners.forEach(function(banner) {
+      banner.style.opacity = '0';
+      banner.style.transform = 'translateY(-20px)';
+      setTimeout(function() {
+        banner.style.display = 'none';
+      }, 500); // Wait for fade animation to complete
+    });
+  }, 15000); // 15 seconds
+});
+</script>
 
 {% endblock %}
