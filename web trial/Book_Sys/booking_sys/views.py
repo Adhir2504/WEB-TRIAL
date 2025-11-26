@@ -83,69 +83,53 @@ def facilities(request):
     return HttpResponse(status=405)
 
 
-# Facility detail view - GET and POST
-@require_http_methods(["GET", "POST"])
+# Facility detail view - GET only (no booking here)
+@require_http_methods(["GET"])
 def facility_detail(request, slug):
-    """Display facility details and handle bookings - GET and POST requests"""
+    """Display facility details only (no booking UI)"""
     # For now, using slug as facility name search
     facility = get_object_or_404(Facility, facility_name__icontains=slug.replace('-', ' '))
     courts = Court.objects.filter(facility=facility)
-    
-    if request.method == 'GET':
-        # Get available slots for all courts in this facility
-        available_slots = Slot.objects.filter(
-            court__facility=facility,
-            slot_status='available'
-        ).select_related('court')
-        
-        booking_form = None
-        if request.user.is_authenticated:
-            booking_form = BookingForm(user=request.user)
-            # Filter slots to only show those for this facility's courts
-            booking_form.fields['slot'].queryset = available_slots
-        
-        return render(request, 'facility_details.html', {
-            'facility': facility,
-            'courts': courts,
-            'available_slots': available_slots,
-            'booking_form': booking_form
+
+    return render(request, 'facility_details.html', {
+        'facility': facility,
+        'courts': courts,
+    })
+
+
+# Facility courts / booking view - GET only (booking via per-slot actions)
+@login_required
+@require_http_methods(["GET"])
+def facility_courts(request, slug):
+    """Display courts and available slots for a facility, grouped per court"""
+    facility = get_object_or_404(Facility, facility_name__icontains=slug.replace('-', ' '))
+    courts = Court.objects.filter(facility=facility, court_status='available').order_by('court_name')
+
+    # Get available slots for all courts in this facility
+    slots = Slot.objects.filter(
+        court__facility=facility,
+        slot_status='available'
+    ).select_related('court').order_by('day_of_week', 'start_time')
+
+    # Group slots by court
+    slots_by_court = {}
+    for slot in slots:
+        slots_by_court.setdefault(slot.court_id, []).append(slot)
+
+    court_data = []
+    for court in courts:
+        court_data.append({
+            'court': court,
+            'slots': slots_by_court.get(court.court_id, []),
         })
-    
-    elif request.method == 'POST':
-        if not request.user.is_authenticated:
-            messages.error(request, 'Please log in to make a booking.')
-            return redirect('booking_sys:login')
-        
-        booking_form = BookingForm(request.POST, user=request.user)
-        if booking_form.is_valid():
-            booking = booking_form.save(commit=False)
-            booking.user = request.user
-            
-            # Verify the slot belongs to this facility
-            slot = booking.slot
-            if slot.court.facility != facility:
-                messages.error(request, 'Invalid slot selected.')
-                return redirect('booking_sys:facility_detail', slug=slug)
-            
-            booking.save()
-            
-            # Update slot status
-            slot.change_status('booked')
-            
-            messages.success(request, 'Booking created successfully!')
-            return redirect('booking_sys:profile')
-        else:
-            messages.error(request, 'Please correct the errors below.')
-            available_slots = Slot.objects.filter(
-                court__facility=facility,
-                slot_status='available'
-            ).select_related('court')
-            return render(request, 'facility_details.html', {
-                'facility': facility,
-                'courts': courts,
-                'available_slots': available_slots,
-                'booking_form': booking_form
-            })
+
+    day_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+    return render(request, 'facility_courts.html', {
+        'facility': facility,
+        'court_data': court_data,
+        'day_names': day_names,
+    })
 
 
 # Calendar view - GET only
@@ -446,11 +430,11 @@ def register(request):
         return render(request, 'registration/register.html', {'form': form})
 
 
-# Booking creation - GET and POST
+# Booking creation - legacy generic view (kept for compatibility, not linked in UI)
 @login_required
 @require_http_methods(["GET", "POST"])
 def create_booking(request):
-    """Create a booking - handles GET and POST requests"""
+    """Create a booking - generic form (not used in new flow)"""
     if request.method == 'GET':
         form = BookingForm(user=request.user)
         available_slots = Slot.objects.filter(slot_status='available')
@@ -479,6 +463,22 @@ def create_booking(request):
                 'form': form,
                 'available_slots': available_slots
             })
+
+
+@login_required
+@require_http_methods(["POST"])
+def book_slot(request, slot_id):
+    """Book a specific slot from the facility courts page"""
+    slot = get_object_or_404(Slot, slot_id=slot_id, slot_status='available')
+
+    # Create booking
+    booking = Booking.objects.create(user=request.user, slot=slot)
+
+    # Update slot status
+    slot.change_status('booked')
+
+    messages.success(request, f'Booking created for {slot.court.court_name} on slot {slot.start_time} - {slot.end_time}.')
+    return redirect('booking_sys:profile')
 
 
 # Facility creation (Admin) - GET and POST

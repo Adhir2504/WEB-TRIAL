@@ -56,55 +56,29 @@
     </div>
   </div>
 
-  <!-- Booking sidebar -->
+  <!-- Booking call-to-action only, no form here -->
   <aside class="booking-sidebar">
     <div class="booking-card">
-      <h2>Book this facility</h2>
-      
-      {% if user.is_authenticated %}
-        {% if facility.facility_status == 'available' %}
-          {% if booking_form %}
-            <form method="post" action="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}">
-              {% csrf_token %}
-              
-              <label class="form-label">Select Available Slot</label>
-              {{ booking_form.slot }}
-              {% if booking_form.slot.errors %}
-                <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ booking_form.slot.errors }}</div>
-              {% endif %}
-              
-              {% if available_slots %}
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
-                  {{ available_slots.count }} slot{{ available_slots.count|pluralize }} available
-                </p>
-              {% else %}
-                <p style="font-size: 0.85rem; color: var(--warning); margin-top: 0.5rem;">
-                  No slots available at the moment.
-                </p>
-              {% endif %}
-
-              <label class="form-label">Additional Notes (Optional)</label>
-              {{ booking_form.notes }}
-              {% if booking_form.notes.errors %}
-                <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">{{ booking_form.notes.errors }}</div>
-              {% endif %}
-
-              <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1rem;" {% if not available_slots %}disabled{% endif %}>Confirm Booking</button>
-            </form>
-          {% else %}
-            <p>No booking form available.</p>
-          {% endif %}
+      <h2>Ready to book?</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem;">
+        Choose a court and time slot on the booking page.
+      </p>
+      {% if facility.facility_status == 'available' %}
+        {% if user.is_authenticated %}
+          <a href="{% url 'booking_sys:facility_courts' facility.facility_name|slugify %}" class="btn btn-primary btn-block">
+            View Courts &amp; Slots
+          </a>
         {% else %}
-          <p style="color: var(--text-muted);">This facility is currently {{ facility.get_facility_status_display|lower }}.</p>
+          <p style="color: var(--text-muted); margin-bottom: 0.75rem;">Please log in to book this facility.</p>
+          <a href="{% url 'booking_sys:login' %}?next={% url 'booking_sys:facility_courts' facility.facility_name|slugify %}" class="btn btn-primary btn-block">
+            Sign In to Book
+          </a>
         {% endif %}
       {% else %}
-        <p style="color: var(--text-muted); margin-bottom: 1rem;">Please log in to make a booking.</p>
-        <a href="{% url 'booking_sys:login' %}" class="btn btn-primary btn-block">Sign In to Book</a>
+        <p style="color: var(--text-muted);">This facility is currently {{ facility.get_facility_status_display|lower }}.</p>
       {% endif %}
-
-      <p class="booking-note">
+      <p class="booking-note" style="margin-top: 1rem;">
         ⚠ By booking this facility, you agree to follow all facility rules and university policies.
-        Cancellations must be made at least 2 hours in advance.
       </p>
     </div>
   </aside>

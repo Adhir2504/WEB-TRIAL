@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Book {{ facility.facility_name }}{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="section-header">
+    <h1>Book {{ facility.facility_name }}</h1>
+    <p>Select a court and available time slot to complete your booking.</p>
+  </div>
+
+  <div class="facility-detail-layout">
+    <div class="facility-summary-card">
+      <h2 style="margin-top: 0;">Facility Overview</h2>
+      <p style="margin: 0.25rem 0;"><strong>Location:</strong> {{ facility.location }}</p>
+      <p style="margin: 0.25rem 0;"><strong>Type:</strong> {{ facility.get_facility_type_display }}</p>
+      <p style="margin: 0.25rem 0;"><strong>Status:</strong>
+        {% if facility.facility_status == 'available' %}
+          ✅ Available
+        {% elif facility.facility_status == 'maintenance' %}
+          ⚠️ Under Maintenance
+        {% else %}
+          ❌ Closed
+        {% endif %}
+      </p>
+      <p style="margin-top: 0.75rem; color: var(--text-muted);">
+        {{ facility.description|default:"No description available." }}
+      </p>
+      <a href="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}" class="btn btn-soft" style="margin-top: 0.75rem;">View facility details</a>
+    </div>
+
+    <div class="courts-grid">
+      {% if court_data %}
+        {% for item in court_data %}
+          {% with court=item.court slots=item.slots %}
+            <article class="court-card">
+              <div class="court-header">
+                <h2>{{ court.court_name }}</h2>
+                <p class="court-meta">
+                  {{ court.sport_type }} · Capacity: {{ court.capacity }}
+                </p>
+                <p class="court-status">
+                  {% if court.court_status == 'available' %}
+                    <span class="badge badge-available">Available</span>
+                  {% elif court.court_status == 'maintenance' %}
+                    <span class="badge badge-soon">Under Maintenance</span>
+                  {% else %}
+                    <span class="badge badge-unavailable">Closed</span>
+                  {% endif %}
+                </p>
+              </div>
+
+              <div class="court-slots">
+                <h3>Available Time Slots</h3>
+                {% if slots %}
+                  <div class="slot-grid">
+                    {% for slot in slots %}
+                      <form method="post" action="{% url 'booking_sys:book_slot' slot.slot_id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="slot-pill">
+                          <span class="slot-day">
+                            {% with d=slot.day_of_week %}
+                              {% if d == 0 %}Mon{% elif d == 1 %}Tue{% elif d == 2 %}Wed{% elif d == 3 %}Thu{% elif d == 4 %}Fri{% elif d == 5 %}Sat{% else %}Sun{% endif %}
+                            {% endwith %}
+                          </span>
+                          <span class="slot-time">
+                            {{ slot.start_time|time:"g:i A" }} – {{ slot.end_time|time:"g:i A" }}
+                          </span>
+                          <span class="slot-type">
+                            {{ slot.get_slot_type_display }}
+                          </span>
+                        </button>
+                      </form>
+                    {% endfor %}
+                  </div>
+                  <p class="slot-hint">Click a slot to book instantly. You will be redirected to your profile after booking.</p>
+                {% else %}
+                  <p style="color: var(--text-muted); font-size: 0.9rem;">No available slots for this court at the moment.</p>
+                {% endif %}
+              </div>
+            </article>
+          {% endwith %}
+        {% endfor %}
+      {% else %}
+        <p style="color: var(--text-muted);">No available courts for this facility at the moment.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .facility-detail-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+
+  @media (max-width: 900px) {
+    .facility-detail-layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .facility-summary-card {
+    background: var(--surface);
+    border-radius: 18px;
+    box-shadow: var(--shadow-soft);
+    padding: 1.25rem 1.4rem;
+  }
+
+  .courts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+  }
+
+  .court-card {
+    background: var(--surface);
+    border-radius: 18px;
+    box-shadow: var(--shadow-soft);
+    padding: 1.25rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .court-header h2 {
+    margin: 0;
+  }
+
+  .court-meta {
+    margin: 0.25rem 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+
+  .court-status {
+    margin: 0.25rem 0 0 0;
+  }
+
+  .court-slots h3 {
+    margin: 0.5rem 0;
+    font-size: 1rem;
+  }
+
+  .slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .slot-pill {
+    width: 100%;
+    border-radius: 16px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-subtle);
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .slot-pill:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .slot-day {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-muted);
+  }
+
+  .slot-time {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+
+  .slot-type {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .slot-hint {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+</style>
+{% endblock %}
+
+

@@ -6,6 +6,7 @@ urlpatterns = [
     path('', views.home, name='home'),
     path('facilities/', views.facilities, name='facilities'),
     path('facility/<slug:slug>/', views.facility_detail, name='facility_detail'),
+    path('facility/<slug:slug>/courts/', views.facility_courts, name='facility_courts'),
     path('calendar/', views.calendar_view, name='calendar'),
     path('search/', views.search_facilities, name='search_facilities'),
     
@@ -19,6 +20,7 @@ urlpatterns = [
     
     # Booking management (GET and POST)
     path('booking/create/', views.create_booking, name='create_booking'),
+    path('booking/slot/<uuid:slot_id>/book/', views.book_slot, name='book_slot'),
     path('booking/<uuid:booking_id>/cancel/', views.cancel_booking, name='cancel_booking'),
     
     # Admin functions (GET and POST) - using 'manage' prefix to avoid conflict with Django admin
