@@ -164,11 +164,12 @@ body {
 }
 
 .section {
-  margin-bottom: 2.5rem;
+  margin-bottom: 3rem;
+  padding-top: 1rem;
 }
 
 .section-header {
-  margin-bottom: 1.25rem;
+  margin-bottom: 2rem;
 }
 
 .section-header h1,
@@ -193,6 +194,7 @@ body {
   justify-content: center;
   padding: 3rem 3.5rem;
   border-radius: 24px;
+  margin-bottom: 3rem;
 
   /* Default gradient - no background image */
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.35) 100%), linear-gradient(135deg, #0f766e 0%, #2563eb 100%);
@@ -257,8 +259,9 @@ body {
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
 }
 
 .facility-card {
@@ -403,12 +406,13 @@ body {
 .filter-bar {
   display: grid;
   grid-template-columns: 2fr 1.2fr 1.4fr auto;
-  gap: 0.75rem;
+  gap: 1rem;
   align-items: flex-end;
   background: var(--surface);
-  padding: 1rem 1rem;
+  padding: 1.5rem 1.5rem;
   border-radius: 18px;
   box-shadow: var(--shadow-soft);
+  margin-bottom: 0;
 }
 
 .filter-field label {
@@ -645,8 +649,9 @@ textarea.form-control {
 .card-section {
   background: var(--surface);
   border-radius: 18px;
-  padding: 1.1rem 1.3rem;
+  padding: 1.5rem 1.75rem;
   box-shadow: var(--shadow-soft);
+  margin-bottom: 1.5rem;
 }
 
 .booking-list-item {

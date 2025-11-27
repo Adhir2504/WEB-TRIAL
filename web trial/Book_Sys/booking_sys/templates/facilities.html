@@ -10,6 +10,7 @@
   </div>
 
   <!-- Search & filters -->
+  <div style="margin-bottom: 2rem;">
   <form method="get" action="{% url 'booking_sys:search_facilities' %}">
     <div class="filter-bar">
       <div class="filter-field">
@@ -41,8 +42,7 @@
       </div>
     </div>
   </form>
-  
-  <button class="btn btn-soft filter-more" style="margin-top: 0.75rem;">More Filters</button>
+  </div>
 
   <!-- Facilities grid -->
   <div class="card-grid facilities-grid">

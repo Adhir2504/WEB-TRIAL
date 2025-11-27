@@ -5,11 +5,11 @@
 {% block content %}
 
 <!-- Featured Announcements Banner -->
-<div id="announcementBanners">
+<div id="announcementBanners" style="margin-bottom: 2rem;">
 {% if announcements %}
   {% for announcement in announcements %}
     {% if announcement.is_featured %}
-      <div class="announcement-banner" style="background: {% if announcement.priority == 'urgent' %}#fee2e2; border-left: 4px solid #dc2626;{% elif announcement.priority == 'high' %}#fef3c7; border-left: 4px solid #f59e0b;{% else %}#dbeafe; border-left: 4px solid #3b82f6;{% endif %} padding: 1rem 1.5rem; margin-bottom: 1rem; transition: opacity 0.5s ease-out, transform 0.5s ease-out;">
+      <div class="announcement-banner" style="background: {% if announcement.priority == 'urgent' %}#fee2e2; border-left: 4px solid #dc2626;{% elif announcement.priority == 'high' %}#fef3c7; border-left: 4px solid #f59e0b;{% else %}#dbeafe; border-left: 4px solid #3b82f6;{% endif %} padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; border-radius: 12px; transition: opacity 0.5s ease-out, transform 0.5s ease-out;">
         <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: start;">
           <div>
             <strong style="{% if announcement.priority == 'urgent' %}color: #dc2626;{% elif announcement.priority == 'high' %}color: #d97706;{% else %}color: #2563eb;{% endif %}">

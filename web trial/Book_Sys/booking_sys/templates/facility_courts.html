@@ -15,8 +15,8 @@
 
   <!-- Date Selection Card -->
   {% if not selected_date %}
-  <div style="max-width: 500px; margin: 0 auto 2rem;">
-    <div class="card-section" style="text-align: center; padding: 1.5rem;">
+  <div style="max-width: 600px; margin: 0 auto 3rem;">
+    <div class="card-section" style="text-align: center; padding: 2rem;">
       <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📅</div>
       <h2 style="margin: 0 0 0.5rem 0; font-size: 1.5rem;">Select a Date</h2>
       <p style="color: #6b7280; margin-bottom: 1rem; font-size: 0.9rem;">Choose a date to view available courts and time slots</p>
@@ -34,7 +34,7 @@
   {% if selected_date %}
     <!-- Booking Status Alert -->
     {% if user.is_authenticated and user_booking_status %}
-      <div class="card-section" style="margin-bottom: 1.5rem; {% if not user_booking_status.can_book_this_week or not user_booking_status.can_book_this_month %}background: #fef2f2; border-left: 4px solid #dc2626;{% else %}background: #f0f9ff; border-left: 4px solid #0891b2;{% endif %}">
+      <div class="card-section" style="margin-bottom: 2rem; padding: 1.25rem 1.5rem; {% if not user_booking_status.can_book_this_week or not user_booking_status.can_book_this_month %}background: #fef2f2; border-left: 4px solid #dc2626;{% else %}background: #f0f9ff; border-left: 4px solid #0891b2;{% endif %}">
         <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem;">
           {% if not user_booking_status.can_book_this_week %}
             ⚠️ Weekly Booking Limit Reached
@@ -62,7 +62,7 @@
     {% endif %}
 
     {% if court_data %}
-      <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div style="margin-bottom: 2rem; padding-top: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
         <div style="color: #6b7280; font-size: 0.9rem;">
           Showing {{ court_data|length }} available court{{ court_data|length|pluralize }}
         </div>
