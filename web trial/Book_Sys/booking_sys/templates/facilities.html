@@ -59,7 +59,9 @@
                 <div class="facility-image {{ facility.facility_type }}-bg"></div>
               {% endif %}
               <div class="facility-badge-overlay">
-                {% if facility.facility_status == 'available' %}
+                {% if item.facility_blackout and selected_date %}
+                  <span class="badge badge-unavailable">Unavailable</span>
+                {% elif facility.facility_status == 'available' %}
                   <span class="badge badge-available">Available</span>
                 {% elif facility.facility_status == 'maintenance' %}
                   <span class="badge badge-soon">Soon Available</span>
@@ -99,9 +101,22 @@
                 <span class="feature-icon">🅿️ Free Parking</span>
               </div>
               
+              <!-- Facility-wide Blackout Warning -->
+              {% if item.facility_blackout and selected_date %}
+                <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem;">
+                  <div style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                    <span style="font-size: 1.2rem; flex-shrink: 0;">🚫</span>
+                    <div style="font-size: 0.85rem;">
+                      <strong style="color: #991b1b; display: block; margin-bottom: 0.25rem;">Facility Unavailable</strong>
+                      <span style="color: #b91c1c;">{{ item.facility_unavailable_during }}<br>📌 Reason: {{ item.facility_blackout.reason }}</span>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+              
               <div class="facility-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <a href="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}" class="btn btn-outline" style="flex: 1; min-width: 120px;">View Details</a>
-                {% if facility.facility_status == 'available' %}
+                {% if facility.facility_status == 'available' and not item.facility_blackout %}
                   <button class="btn btn-primary" onclick="openBookingModal('{{ facility.facility_name }}', '{{ facility.facility_name|slugify }}', '{{ facility.facility_id }}')" style="flex: 1; min-width: 120px;">Book Now</button>
                 {% else %}
                   <button class="btn btn-disabled" disabled style="flex: 1; min-width: 120px;">Unavailable</button>

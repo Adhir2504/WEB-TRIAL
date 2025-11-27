@@ -49,7 +49,10 @@
         📅 Set Availability
       </a>
       <a href="{% url 'booking_sys:create_blackout' %}" class="btn btn-outline" style="text-align: center; padding: 1rem;">
-        🚫 Create Blackout
+        🚫 Create Court Blackout
+      </a>
+      <a href="{% url 'booking_sys:create_facility_blackout' %}" class="btn btn-outline" style="text-align: center; padding: 1rem;">
+        🚫 Create Facility Blackout
       </a>
       <a href="/admin/" class="btn btn-outline" style="text-align: center; padding: 1rem;">
         ⚙️ Django Admin
@@ -148,6 +151,7 @@
               <th style="text-align: left; padding: 0.75rem;">Facility</th>
               <th style="text-align: left; padding: 0.75rem;">Court</th>
               <th style="text-align: left; padding: 0.75rem;">Date</th>
+              <th style="text-align: left; padding: 0.75rem;">Time</th>
               <th style="text-align: left; padding: 0.75rem;">Status</th>
             </tr>
           </thead>
@@ -155,12 +159,13 @@
             {% for booking in recent_bookings %}
               <tr style="border-bottom: 1px solid var(--border-subtle);">
                 <td style="padding: 0.75rem;">{{ booking.user.first_name }} {{ booking.user.last_name }}</td>
-                <td style="padding: 0.75rem;">{{ booking.slot.court.facility.facility_name }}</td>
-                <td style="padding: 0.75rem;">{{ booking.slot.court.court_name }}</td>
-                <td style="padding: 0.75rem;">{{ booking.booking_date_time|date:"M d, Y g:i A" }}</td>
+                <td style="padding: 0.75rem;">{{ booking.facility.facility_name }}</td>
+                <td style="padding: 0.75rem;">{{ booking.court.court_name }}</td>
+                <td style="padding: 0.75rem;">{{ booking.booking_date|date:"M d, Y" }}</td>
+                <td style="padding: 0.75rem;">{{ booking.start_time|date:"g:i A" }} - {{ booking.end_time|date:"g:i A" }}</td>
                 <td style="padding: 0.75rem;">
-                  <span style="padding: 0.25rem 0.75rem; background: {% if booking.fulfilled == 'yes' %}#d1fae5{% elif booking.fulfilled == 'cancelled' %}#fee2e2{% else %}#dbeafe{% endif %}; color: {% if booking.fulfilled == 'yes' %}#065f46{% elif booking.fulfilled == 'cancelled' %}#b91c1c{% else %}#1e40af{% endif %}; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
-                    {{ booking.get_fulfilled_display }}
+                  <span style="padding: 0.25rem 0.75rem; background: {% if booking.status == 'completed' %}#d1fae5{% elif booking.status == 'cancelled' %}#fee2e2{% elif booking.status == 'confirmed' %}#dbeafe{% else %}#fef3c7{% endif %}; color: {% if booking.status == 'completed' %}#065f46{% elif booking.status == 'cancelled' %}#b91c1c{% elif booking.status == 'confirmed' %}#1e40af{% else %}#92400e{% endif %}; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                    {{ booking.get_status_display }}
                   </span>
                 </td>
               </tr>

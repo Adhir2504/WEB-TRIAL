@@ -267,7 +267,15 @@ body {
   background: #cbd5f5;
   background-size: cover;
   background-position: center;
+  background-blend-mode: multiply;
+  position: relative;
+  transition: background-size 0.3s ease;
 }
+
+.facility-image:hover {
+  background-size: 110%;
+}
+
 .facility-hero-image {
   position: relative;
   overflow: hidden;

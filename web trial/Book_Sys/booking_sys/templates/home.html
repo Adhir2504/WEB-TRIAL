@@ -55,7 +55,11 @@
     {% if facilities %}
       {% for facility in facilities|slice:":3" %}
         <article class="facility-card">
-          <div class="facility-image {{ facility.facility_type }}-bg"></div>
+          <div class="facility-image {{ facility.facility_type }}-bg" 
+               {% if facility.image_url %}
+                 style="background-image: url('{{ facility.image_url }}');"
+               {% endif %}>
+          </div>
           <div class="facility-body">
             <div class="facility-header">
               <h3>{{ facility.facility_name|upper }}</h3>

@@ -8,16 +8,17 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.contrib.auth.forms import AuthenticationForm
 from django.db import models
+from django.core.exceptions import ValidationError
 from datetime import datetime, timedelta, date
 import json
 from .models import (
     User, Student, Staff, Facility, Court, Slot, Booking, 
-    Blackout, Availability, Notification, Announcement
+    Blackout, FacilityBlackout, Availability, Notification, Announcement
 )
 from .forms import (
     UserRegistrationForm, UserProfileEditForm, StudentProfileForm, 
     StaffProfileForm, FacilityForm, CourtForm, SlotForm, BookingForm, 
-    BlackoutForm, AvailabilityForm, NotificationForm, AnnouncementForm
+    BlackoutForm, FacilityBlackoutForm, AvailabilityForm, NotificationForm, AnnouncementForm
 )
 
 
@@ -442,6 +443,23 @@ def create_booking(request):
 def book_slot(request, slot_id):
     """Book a specific slot from the facility courts page"""
     slot = get_object_or_404(Slot, slot_id=slot_id, slot_status='available')
+    
+    # Check for blackout periods
+    from datetime import datetime as dt
+    booking_date = dt.now().date()  # Get current booking context
+    start_datetime = dt.combine(booking_date, slot.start_time)
+    end_datetime = dt.combine(booking_date, slot.end_time)
+    
+    blackout_conflicts = Blackout.objects.filter(
+        court=slot.court,
+        start_date_time__lt=end_datetime,
+        end_date_time__gt=start_datetime
+    )
+    
+    if blackout_conflicts.exists():
+        blackout = blackout_conflicts.first()
+        messages.error(request, f'This court is unavailable during this time due to blackout: {blackout.reason}')
+        return redirect('booking_sys:profile')
 
     # Create booking
     booking = Booking.objects.create(user=request.user, slot=slot)
@@ -515,24 +533,52 @@ def edit_facility(request, facility_id):
 @login_required
 @require_http_methods(["GET", "POST"])
 def create_court(request):
-    """Create a court - handles GET and POST requests (Admin only)"""
+    """Create or edit a court - handles GET and POST requests (Admin only)"""
     if not (request.user.is_staff or request.user.member_type == 'admin'):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('booking_sys:home')
     
+    court = None
+    court_id = request.GET.get('edit')
+    is_edit = False
+    
+    if court_id:
+        try:
+            court = Court.objects.get(pk=court_id)
+            is_edit = True
+        except Court.DoesNotExist:
+            messages.error(request, 'Court not found.')
+            return redirect('booking_sys:facilities')
+    
     if request.method == 'GET':
-        form = CourtForm()
-        return render(request, 'admin/create_court.html', {'form': form})
+        if is_edit:
+            form = CourtForm(instance=court)
+        else:
+            form = CourtForm()
+        return render(request, 'admin/create_court.html', {
+            'form': form,
+            'court': court,
+            'is_edit': is_edit
+        })
     
     elif request.method == 'POST':
-        form = CourtForm(request.POST)
+        if is_edit:
+            form = CourtForm(request.POST, instance=court)
+        else:
+            form = CourtForm(request.POST)
+        
         if form.is_valid():
             court = form.save()
-            messages.success(request, f'Court "{court.court_name}" created successfully!')
+            action = 'updated' if is_edit else 'created'
+            messages.success(request, f'Court "{court.court_name}" {action} successfully!')
             return redirect('booking_sys:facilities')
         else:
             messages.error(request, 'Please correct the errors below.')
-            return render(request, 'admin/create_court.html', {'form': form})
+            return render(request, 'admin/create_court.html', {
+                'form': form,
+                'court': court,
+                'is_edit': is_edit
+            })
 
 
 # Slot creation (Admin) - GET and POST
@@ -581,6 +627,30 @@ def create_blackout(request):
         else:
             messages.error(request, 'Please correct the errors below.')
             return render(request, 'admin/create_blackout.html', {'form': form})
+
+
+# Facility Blackout creation (Admin) - GET and POST
+@login_required
+@require_http_methods(["GET", "POST"])
+def create_facility_blackout(request):
+    """Create a facility-wide blackout period - handles GET and POST requests (Admin only)"""
+    if not (request.user.is_staff or request.user.member_type == 'admin'):
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('booking_sys:home')
+    
+    if request.method == 'GET':
+        form = FacilityBlackoutForm()
+        return render(request, 'admin/create_facility_blackout.html', {'form': form})
+    
+    elif request.method == 'POST':
+        form = FacilityBlackoutForm(request.POST)
+        if form.is_valid():
+            facility_blackout = form.save()
+            messages.success(request, f'Facility-wide blackout created successfully for {facility_blackout.facility.facility_name}!')
+            return redirect('booking_sys:admin_dashboard')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+            return render(request, 'admin/create_facility_blackout.html', {'form': form})
 
 
 # Availability creation (Admin) - GET and POST
@@ -696,6 +766,7 @@ def search_facilities(request):
     """Search facilities by name or type - GET request"""
     query = request.GET.get('q', '')
     facility_type = request.GET.get('type', '')
+    date_str = request.GET.get('date', '')
     
     facilities_list = Facility.objects.all()
     
@@ -731,17 +802,49 @@ def search_facilities(request):
         
         total_capacity = sum(court.capacity for court in courts) if courts.exists() else 0
         
+        # Check for facility-wide blackout on selected date
+        facility_blackout = None
+        facility_unavailable_during = None
+        if date_str:
+            try:
+                from datetime import datetime
+                # Parse the date string (format: YYYY-MM-DD)
+                date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                # Check for overlapping facility blackouts
+                # We need to check if any blackout period covers any time on this date
+                start_of_day = timezone.make_aware(datetime.combine(date_obj, datetime.min.time()))
+                end_of_day = timezone.make_aware(datetime.combine(date_obj, datetime.max.time()))
+                
+                from .models import FacilityBlackout
+                blackout = FacilityBlackout.objects.filter(
+                    facility=facility,
+                    start_date_time__lt=end_of_day,
+                    end_date_time__gt=start_of_day
+                ).first()
+                
+                if blackout:
+                    facility_blackout = blackout
+                    # Format the unavailable time range
+                    blackout_start = blackout.start_date_time.strftime('%I:%M %p')
+                    blackout_end = blackout.end_date_time.strftime('%I:%M %p')
+                    facility_unavailable_during = f"{blackout_start} - {blackout_end}"
+            except Exception:
+                pass
+        
         facilities_with_slots.append({
             'facility': facility,
             'next_slot': next_slot,
             'capacity': total_capacity,
-            'courts_count': courts.count()
+            'courts_count': courts.count(),
+            'facility_blackout': facility_blackout,
+            'facility_unavailable_during': facility_unavailable_during
         })
     
     return render(request, 'facilities.html', {
         'facilities_data': facilities_with_slots,
         'query': query,
-        'selected_type': facility_type
+        'selected_type': facility_type,
+        'selected_date': date_str
     })
 
 
@@ -769,6 +872,29 @@ def api_get_available_slots(request, facility_id):
         # Check user's booking eligibility for this facility
         can_book, message = Booking.can_user_book(request.user, facility, booking_date)
         
+        # Check for facility-wide blackout on this date
+        day_start = datetime.combine(booking_date, datetime.min.time())
+        day_end = datetime.combine(booking_date, datetime.max.time())
+        day_start_aware = timezone.make_aware(day_start) if timezone.is_naive(day_start) else day_start
+        day_end_aware = timezone.make_aware(day_end) if timezone.is_naive(day_end) else day_end
+        
+        facility_blackout = FacilityBlackout.objects.filter(
+            facility=facility,
+            start_date_time__lt=day_end_aware,
+            end_date_time__gt=day_start_aware
+        ).first()
+        
+        if facility_blackout:
+            blackout_start = facility_blackout.start_date_time.strftime('%I:%M %p')
+            blackout_end = facility_blackout.end_date_time.strftime('%I:%M %p')
+            return JsonResponse({
+                'error': f'Facility is unavailable during this time',
+                'facility_closed': True,
+                'blackout_reason': facility_blackout.reason,
+                'blackout_time': f'{blackout_start} - {blackout_end}',
+                'message': f'{facility_blackout.reason} ({blackout_start} - {blackout_end})'
+            }, status=400)
+        
         # Get all courts for this facility
         courts = Court.objects.filter(facility=facility, court_status='available')
         
@@ -783,6 +909,13 @@ def api_get_available_slots(request, facility_id):
             except Availability.DoesNotExist:
                 continue  # Court not available on this day
             
+            # Check for blackouts on this date
+            blackouts_today = Blackout.objects.filter(
+                court=court,
+                start_date_time__lt=day_end_aware,
+                end_date_time__gt=day_start_aware
+            ).order_by('start_date_time')
+            
             # Get slots for this court and day
             slots = Slot.objects.filter(
                 court=court,
@@ -792,10 +925,29 @@ def api_get_available_slots(request, facility_id):
             
             # Check which slots are actually available (not booked)
             available_slots = []
+            blackout_slots = []
             for slot in slots:
                 is_available = Booking.is_slot_available(
                     court, booking_date, slot.start_time, slot.end_time
                 )
+                
+                # Also check for blackout periods
+                blackout_reason = None
+                if is_available:
+                    start_datetime = datetime.combine(booking_date, slot.start_time)
+                    end_datetime = datetime.combine(booking_date, slot.end_time)
+                    
+                    blackout_conflicts = Blackout.objects.filter(
+                        court=court,
+                        start_date_time__lt=end_datetime,
+                        end_date_time__gt=start_datetime
+                    )
+                    
+                    if blackout_conflicts.exists():
+                        blackout = blackout_conflicts.first()
+                        is_available = False
+                        blackout_reason = blackout.reason
+                
                 if is_available:
                     available_slots.append({
                         'slot_id': str(slot.slot_id),
@@ -805,17 +957,32 @@ def api_get_available_slots(request, facility_id):
                         'end_time_display': slot.end_time.strftime('%I:%M %p'),
                         'slot_type': slot.get_slot_type_display(),
                     })
+                elif blackout_reason:
+                    blackout_slots.append({
+                        'start_time': slot.start_time.strftime('%H:%M'),
+                        'end_time': slot.end_time.strftime('%H:%M'),
+                        'start_time_display': slot.start_time.strftime('%I:%M %p'),
+                        'end_time_display': slot.end_time.strftime('%I:%M %p'),
+                        'reason': blackout_reason
+                    })
             
-            if available_slots:
-                courts_data.append({
+            if available_slots or blackout_slots:
+                court_data = {
                     'court_id': str(court.court_id),
                     'court_name': court.court_name,
                     'sport_type': court.sport_type,
                     'capacity': court.capacity,
                     'notes': court.notes,
                     'image_url': court.image_url,
-                    'slots': available_slots
-                })
+                    'slots': available_slots,
+                }
+                
+                # Add blackout information if there are blackout slots
+                if blackout_slots:
+                    court_data['blackout_slots'] = blackout_slots
+                    court_data['has_blackouts'] = True
+                
+                courts_data.append(court_data)
         
         return JsonResponse({
             'can_book': can_book,
@@ -859,6 +1026,42 @@ def api_create_booking(request):
             end_time = datetime.strptime(end_time_str, '%H:%M').time()
         except ValueError as e:
             return JsonResponse({'error': f'Invalid date/time format: {str(e)}'}, status=400)
+        
+        # Check for blackout periods
+        start_datetime = datetime.combine(booking_date, start_time)
+        end_datetime = datetime.combine(booking_date, end_time)
+        
+        # Make timezone-aware using the current timezone
+        if timezone.is_naive(start_datetime):
+            start_datetime = timezone.make_aware(start_datetime)
+        if timezone.is_naive(end_datetime):
+            end_datetime = timezone.make_aware(end_datetime)
+        
+        # Check for facility-level blackouts FIRST (highest priority)
+        facility_blackout_conflicts = FacilityBlackout.objects.filter(
+            facility=facility,
+            start_date_time__lt=end_datetime,
+            end_date_time__gt=start_datetime
+        )
+        
+        if facility_blackout_conflicts.exists():
+            facility_blackout = facility_blackout_conflicts.first()
+            return JsonResponse({
+                'error': f'This facility is closed during this time: {facility_blackout.reason}'
+            }, status=400)
+        
+        # Check for court-level blackouts
+        blackout_conflicts = Blackout.objects.filter(
+            court=court,
+            start_date_time__lt=end_datetime,
+            end_date_time__gt=start_datetime
+        )
+        
+        if blackout_conflicts.exists():
+            blackout = blackout_conflicts.first()
+            return JsonResponse({
+                'error': f'This court is unavailable during this time due to blackout: {blackout.reason}'
+            }, status=400)
         
         # Check if slot is still available
         if not Booking.is_slot_available(court, booking_date, start_time, end_time):

@@ -7,7 +7,7 @@ from django.utils.safestring import mark_safe
 from django import forms
 from .models import (
     User, Student, Staff, Facility, Court, Slot, Booking, 
-    Blackout, Availability, Notification, AuditLog, Announcement
+    Blackout, FacilityBlackout, Availability, Notification, AuditLog, Announcement
 )
 
 
@@ -224,7 +224,7 @@ class CourtAdmin(admin.ModelAdmin):
         }),
     )
     
-    actions = ['mark_as_available', 'mark_as_maintenance', 'mark_as_closed']
+    actions = ['mark_as_available', 'mark_as_maintenance', 'mark_as_closed', 'setup_court_schedule']
     
     def facility_link(self, obj):
         url = reverse('admin:booking_sys_facility_change', args=[obj.facility.pk])
@@ -232,7 +232,7 @@ class CourtAdmin(admin.ModelAdmin):
     facility_link.short_description = 'Facility'
     
     def bookings_count(self, obj):
-        count = Booking.objects.filter(slot__court=obj, fulfilled='no').count()
+        count = Booking.objects.filter(court=obj, status__in=['pending', 'confirmed']).count()
         return count
     bookings_count.short_description = 'Active Bookings'
     
@@ -250,15 +250,105 @@ class CourtAdmin(admin.ModelAdmin):
         updated = queryset.update(court_status='closed')
         self.message_user(request, f'{updated} court(s) marked as closed.')
     mark_as_closed.short_description = 'Mark selected courts as closed'
+    
+    def setup_court_schedule(self, request, queryset):
+        """Set up availability and slots for selected courts"""
+        from datetime import time
+        
+        created_availability = 0
+        created_slots = 0
+        
+        # Default availability: 6 AM to 10 PM
+        default_open_time = time(6, 0)
+        default_close_time = time(22, 0)
+        
+        # Default time slots: every 2 hours from 8 AM to 8 PM
+        default_slot_times = [
+            (time(8, 0), time(10, 0)),
+            (time(10, 30), time(12, 30)),
+            (time(13, 0), time(15, 0)),
+            (time(15, 30), time(17, 30)),
+            (time(18, 0), time(20, 0)),
+        ]
+        
+        for court in queryset:
+            # Create availability for all 7 days
+            for day in range(7):
+                avail, created = Availability.objects.get_or_create(
+                    court=court,
+                    day_of_week=day,
+                    defaults={
+                        'open_time': default_open_time,
+                        'close_time': default_close_time,
+                        'notes': 'Default schedule'
+                    }
+                )
+                if created:
+                    created_availability += 1
+            
+            # Create slots for all 7 days
+            for day in range(7):
+                for start_time, end_time in default_slot_times:
+                    slot, created = Slot.objects.get_or_create(
+                        court=court,
+                        day_of_week=day,
+                        start_time=start_time,
+                        end_time=end_time,
+                        defaults={
+                            'slot_type': 'regular',
+                            'slot_status': 'available'
+                        }
+                    )
+                    if created:
+                        created_slots += 1
+        
+        self.message_user(
+            request,
+            f'Schedule setup complete! Created {created_availability} availability records and {created_slots} slot records.'
+        )
+    setup_court_schedule.short_description = 'Set up availability and slots for selected courts'
 
 
 # ==================== FACILITY ADMIN ====================
-class CourtInline(admin.TabularInline):
+class FacilityBlackoutInline(admin.TabularInline):
+    model = FacilityBlackout
+    extra = 0
+    fields = ['start_date_time', 'end_date_time', 'reason']
+    verbose_name = 'Facility Blackout Period'
+    verbose_name_plural = 'Facility Blackout Periods'
+
+
+class CourtInline(admin.StackedInline):
     model = Court
     extra = 1
-    fields = ['court_name', 'sport_type', 'capacity', 'court_status']
     verbose_name = 'Court'
     verbose_name_plural = 'Courts'
+    show_change_link = True
+    
+    def get_fields(self, request, obj=None):
+        """Return fields for the inline"""
+        fields = ['court_name', 'sport_type', 'capacity', 'court_status', 'image_url', 'notes']
+        if obj and obj.pk:
+            fields.append('edit_court_link')
+        return fields
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Mark edit_court_link as readonly when displaying"""
+        readonly = []
+        if obj and obj.pk:
+            readonly.append('edit_court_link')
+        return readonly
+    
+    def edit_court_link(self, obj):
+        """Display a button to edit the court"""
+        if obj and obj.pk:
+            url = reverse('admin:booking_sys_court_change', args=[obj.pk])
+            return format_html(
+                '<a class="button" href="{}" target="_blank" style="padding: 10px 15px; background-color: #417690; color: white; text-decoration: none; border-radius: 4px; display: inline-block;">📝 Open Court Editor</a>',
+                url
+            )
+        return ''
+    edit_court_link.short_description = 'Court Editor'
 
 
 @admin.register(Facility)
@@ -267,11 +357,14 @@ class FacilityAdmin(admin.ModelAdmin):
     list_filter = ['facility_type', 'facility_status']
     search_fields = ['facility_name', 'location', 'description']
     readonly_fields = ['facility_id']
-    inlines = [CourtInline]
+    inlines = [CourtInline, FacilityBlackoutInline]
     ordering = ['facility_name']
     fieldsets = (
         ('Basic Information', {
             'fields': ('facility_id', 'facility_name', 'facility_type', 'location')
+        }),
+        ('Media', {
+            'fields': ('image_url',)
         }),
         ('Status', {
             'fields': ('facility_status',)
@@ -365,7 +458,7 @@ class SlotAdmin(admin.ModelAdmin):
     time_range.short_description = 'Time Range'
     
     def bookings_count(self, obj):
-        count = obj.bookings.filter(fulfilled='no').count()
+        count = obj.date_bookings.filter(status__in=['pending', 'confirmed']).count()
         return count
     bookings_count.short_description = 'Active Bookings'
 
@@ -465,6 +558,46 @@ class BlackoutAdmin(admin.ModelAdmin):
         url = reverse('admin:booking_sys_court_change', args=[obj.court.pk])
         return format_html('<a href="{}">{}</a>', url, obj.court.court_name)
     court_link.short_description = 'Court'
+    
+    def date_range(self, obj):
+        start = obj.start_date_time.strftime('%Y-%m-%d %I:%M %p')
+        end = obj.end_date_time.strftime('%Y-%m-%d %I:%M %p')
+        return f"{start} to {end}"
+    date_range.short_description = 'Date Range'
+    
+    def reason_short(self, obj):
+        return obj.reason[:50] + '...' if len(obj.reason) > 50 else obj.reason
+    reason_short.short_description = 'Reason'
+
+
+# ==================== FACILITY BLACKOUT ADMIN ====================
+@admin.register(FacilityBlackout)
+class FacilityBlackoutAdmin(admin.ModelAdmin):
+    list_display = ['facility_blackout_id_short', 'facility_link', 'date_range', 'reason_short']
+    list_filter = ['facility', 'start_date_time']
+    search_fields = ['facility__facility_name', 'reason']
+    readonly_fields = ['facility_blackout_id']
+    date_hierarchy = 'start_date_time'
+    fieldsets = (
+        ('Facility Information', {
+            'fields': ('facility',)
+        }),
+        ('Blackout Period', {
+            'fields': ('start_date_time', 'end_date_time')
+        }),
+        ('Reason', {
+            'fields': ('reason',)
+        }),
+    )
+    
+    def facility_blackout_id_short(self, obj):
+        return str(obj.facility_blackout_id)[:8] + '...'
+    facility_blackout_id_short.short_description = 'Blackout ID'
+    
+    def facility_link(self, obj):
+        url = reverse('admin:booking_sys_facility_change', args=[obj.facility.pk])
+        return format_html('<a href="{}">{}</a>', url, obj.facility.facility_name)
+    facility_link.short_description = 'Facility'
     
     def date_range(self, obj):
         start = obj.start_date_time.strftime('%Y-%m-%d %I:%M %p')

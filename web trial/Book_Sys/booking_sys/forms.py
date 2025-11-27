@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from .models import (
     User, Student, Staff, Facility, Court, Slot, Booking, 
-    Blackout, Availability, Notification, Announcement
+    Blackout, FacilityBlackout, Availability, Notification, Announcement
 )
 from datetime import datetime, date, time
 import re
@@ -335,8 +335,81 @@ class BlackoutForm(forms.ModelForm):
             start_datetime = datetime.combine(start_date, start_time)
             end_datetime = datetime.combine(end_date, end_time)
             
+            # Make timezone-aware using the current timezone
+            from django.utils import timezone
+            start_datetime = timezone.make_aware(start_datetime)
+            end_datetime = timezone.make_aware(end_datetime)
+            
             if start_datetime >= end_datetime:
                 raise ValidationError("Start date/time must be earlier than end date/time.")
+            
+            cleaned_data['start_date_time'] = start_datetime
+            cleaned_data['end_date_time'] = end_datetime
+        
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.start_date_time = self.cleaned_data['start_date_time']
+        instance.end_date_time = self.cleaned_data['end_date_time']
+        if commit:
+            instance.save()
+        return instance
+
+
+# Facility Blackout Form (for facility-wide blackouts)
+class FacilityBlackoutForm(forms.ModelForm):
+    start_date = forms.DateField(
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    start_time = forms.TimeField(
+        widget=forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'})
+    )
+    end_date = forms.DateField(
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'})
+    )
+    end_time = forms.TimeField(
+        widget=forms.TimeInput(attrs={'class': 'form-control', 'type': 'time'})
+    )
+
+    class Meta:
+        model = FacilityBlackout
+        fields = ('facility', 'reason')
+        widgets = {
+            'facility': forms.Select(attrs={'class': 'form-control'}),
+            'reason': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Reason for facility blackout (e.g., Maintenance, Staff Training, Special Event)'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get('start_date')
+        start_time = cleaned_data.get('start_time')
+        end_date = cleaned_data.get('end_date')
+        end_time = cleaned_data.get('end_time')
+        facility = cleaned_data.get('facility')
+        
+        if start_date and start_time and end_date and end_time:
+            start_datetime = datetime.combine(start_date, start_time)
+            end_datetime = datetime.combine(end_date, end_time)
+            
+            # Make timezone-aware using the current timezone
+            from django.utils import timezone
+            start_datetime = timezone.make_aware(start_datetime)
+            end_datetime = timezone.make_aware(end_datetime)
+            
+            if start_datetime >= end_datetime:
+                raise ValidationError("Start date/time must be earlier than end date/time.")
+            
+            # Check for overlapping facility blackouts
+            if facility:
+                overlaps = FacilityBlackout.objects.filter(
+                    facility=facility,
+                    start_date_time__lt=end_datetime,
+                    end_date_time__gt=start_datetime
+                ).exclude(pk=self.instance.pk if self.instance.pk else None)
+                
+                if overlaps.exists():
+                    raise ValidationError("Facility blackout period overlaps with an existing blackout.")
             
             cleaned_data['start_date_time'] = start_datetime
             cleaned_data['end_date_time'] = end_datetime

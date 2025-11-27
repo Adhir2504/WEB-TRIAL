@@ -39,6 +39,39 @@
         </div>
       </form>
     </div>
+
+    <!-- Courts Section (only show when editing) -->
+    {% if is_edit and facility.courts.all %}
+    <div class="card-section" style="margin-top: 2rem;">
+      <h2>Courts ({{ facility.courts.count }})</h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem;">Manage courts and their schedules</p>
+      
+      <div style="display: grid; gap: 1rem;">
+        {% for court in facility.courts.all %}
+        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; background: #f9fafb;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h3 style="margin: 0; font-size: 1.1rem;">{{ court.court_name }}</h3>
+            <span style="display: inline-block; padding: 0.25rem 0.75rem; background: {% if court.court_status == 'available' %}#d1fae5; color: #065f46;{% elif court.court_status == 'maintenance' %}#fef3c7; color: #92400e;{% else %}#fee2e2; color: #b91c1c;{% endif %}; border-radius: 4px; font-size: 0.85rem;">{{ court.get_court_status_display }}</span>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">
+            <div><strong>Sport Type:</strong> {{ court.sport_type }}</div>
+            <div><strong>Capacity:</strong> {{ court.capacity }} people</div>
+          </div>
+          
+          <div style="display: flex; gap: 0.5rem;">
+            <a href="{% url 'booking_sys:create_court' %}?edit={{ court.pk }}" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.9rem;">Edit Court</a>
+            <a href="{% url 'booking_sys:admin_dashboard' %}" class="btn btn-outline" style="padding: 0.5rem 1rem; font-size: 0.9rem;">📝 Edit Schedule</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      
+      <div style="margin-top: 1rem;">
+        <a href="{% url 'booking_sys:create_court' %}" class="btn btn-primary">+ Add Court to {{ facility.facility_name }}</a>
+      </div>
+    </div>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

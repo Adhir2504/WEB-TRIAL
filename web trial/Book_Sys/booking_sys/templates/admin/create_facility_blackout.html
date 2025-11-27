@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Create Facility Blackout{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <div class="card-section">
+      <h1 style="margin-top: 0;">🚫 Create Facility-Wide Blackout</h1>
+      <p style="color: var(--text-muted); margin-top: 0.5rem;">Mark an entire facility as unavailable for a specific time period</p>
+      
+      {% if messages %}
+        {% for message in messages %}
+          {% if message.tags == 'error' %}
+            <div style="padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 8px; background: #fee2e2; color: #b91c1c;">
+              {{ message }}
+            </div>
+          {% elif message.tags == 'success' %}
+            <div style="padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 8px; background: #d1fae5; color: #065f46;">
+              {{ message }}
+            </div>
+          {% else %}
+            <div style="padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 8px; background: #dbeafe; color: #1e40af;">
+              {{ message }}
+            </div>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+      
+      <form method="post">
+        {% csrf_token %}
+        
+        <div style="background: #f0f9ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 0.75rem; margin-bottom: 1.5rem;">
+          <p style="margin: 0; font-size: 0.9rem; color: #1e40af;">
+            <strong>When to use facility blackouts:</strong><br>
+            • Facility-wide maintenance or renovations<br>
+            • Special events where no bookings are allowed<br>
+            • Staff training sessions<br>
+            • Scheduled closures
+          </p>
+        </div>
+        
+        {% for field in form %}
+          <div style="margin-bottom: 1.5rem;">
+            <label class="form-label" style="display: block; font-weight: 600; margin-bottom: 0.5rem;">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+              <div style="color: #b91c1c; font-size: 0.85rem; margin-top: 0.25rem;">
+                {% for error in field.errors %}
+                  <div>• {{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+        
+        <div style="margin-top: 2rem; display: flex; gap: 0.5rem;">
+          <button type="submit" class="btn btn-primary" style="flex: 1;">Create Facility Blackout</button>
+          <a href="{% url 'booking_sys:admin_dashboard' %}" class="btn btn-outline" style="flex: 1;">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

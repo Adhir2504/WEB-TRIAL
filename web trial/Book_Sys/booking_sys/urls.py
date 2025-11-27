@@ -29,6 +29,7 @@ urlpatterns = [
     path('manage/court/create/', views.create_court, name='create_court'),
     path('manage/slot/create/', views.create_slot, name='create_slot'),
     path('manage/blackout/create/', views.create_blackout, name='create_blackout'),
+    path('manage/facility-blackout/create/', views.create_facility_blackout, name='create_facility_blackout'),
     path('manage/availability/create/', views.create_availability, name='create_availability'),
     path('manage/announcement/create/', views.create_announcement, name='create_announcement'),
     

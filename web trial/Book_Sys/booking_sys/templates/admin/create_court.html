@@ -1,12 +1,15 @@
 {% extends 'base.html' %}
 
-{% block title %}UniBook · Create Court{% endblock %}
+{% block title %}UniBook · {% if is_edit %}Edit Court{% else %}Create Court{% endif %}{% endblock %}
 
 {% block content %}
 <section class="section">
   <div style="max-width: 600px; margin: 0 auto;">
     <div class="card-section">
-      <h1 style="margin-top: 0;">Create New Court</h1>
+      <h1 style="margin-top: 0;">{% if is_edit %}Edit Court{% else %}Create New Court{% endif %}</h1>
+      {% if is_edit %}
+        <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Editing: <strong>{{ court.court_name }}</strong></p>
+      {% endif %}
       
       {% if messages %}
         {% for message in messages %}
@@ -28,7 +31,7 @@
         {% endfor %}
         
         <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
-          <button type="submit" class="btn btn-primary">Create Court</button>
+          <button type="submit" class="btn btn-primary">{% if is_edit %}Update Court{% else %}Create Court{% endif %}</button>
           <a href="{% url 'booking_sys:facilities' %}" class="btn btn-outline">Cancel</a>
         </div>
       </form>

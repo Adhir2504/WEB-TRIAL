@@ -411,17 +411,44 @@ class Blackout(models.Model):
     reason = models.TextField()
 
     def clean(self):
-        overlaps = Blackout.objects.filter(
-            court=self.court,
-            start_date_time__lt=self.end_date_time,
-            end_date_time__gt=self.start_date_time
-        ).exclude(pk=self.pk)
+        # Only check for overlaps if we have the required fields
+        if self.court and self.start_date_time and self.end_date_time:
+            overlaps = Blackout.objects.filter(
+                court=self.court,
+                start_date_time__lt=self.end_date_time,
+                end_date_time__gt=self.start_date_time
+            ).exclude(pk=self.pk)
 
-        if overlaps.exists():
-            raise ValidationError("Blackout period overlaps with an existing blackout.")
+            if overlaps.exists():
+                raise ValidationError("Blackout period overlaps with an existing blackout.")
     
     def __str__(self):
         return f"Blackout {self.blackout_id} - {self.court.court_name}"
+
+
+class FacilityBlackout(models.Model):
+    """Facility-wide blackout for maintenance, events, or full facility closure"""
+    facility_blackout_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    facility = models.ForeignKey(Facility, on_delete=models.CASCADE, related_name='blackouts')
+    start_date_time = models.DateTimeField()
+    end_date_time = models.DateTimeField()
+    reason = models.TextField()
+    
+    def clean(self):
+        # Only check for overlaps if we have the required fields
+        if self.facility and self.start_date_time and self.end_date_time:
+            overlaps = FacilityBlackout.objects.filter(
+                facility=self.facility,
+                start_date_time__lt=self.end_date_time,
+                end_date_time__gt=self.start_date_time
+            ).exclude(pk=self.pk)
+            
+            if overlaps.exists():
+                raise ValidationError("Facility blackout period overlaps with an existing blackout.")
+    
+    def __str__(self):
+        return f"Facility Blackout {self.facility_blackout_id} - {self.facility.facility_name}"
+
 
 class Notification(models.Model):
     NOTIFICATION_CHANNELS = [
