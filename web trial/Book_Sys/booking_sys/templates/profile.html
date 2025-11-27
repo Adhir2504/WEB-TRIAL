@@ -8,7 +8,7 @@
   <div class="profile-header-card">
     <div class="profile-avatar">{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}</div>
     <div>
-      <h1>Hi, {{ user.first_name }}</h1>
+      <h1>{{ user.username|first|upper }}{{ user.username|slice:"1:"|lower }}</h1>
       <p>{{ user.get_member_type_display }} {% if user.member_type == 'student' and user.student %}&middot; {{ user.student.student_id }}{% elif user.member_type == 'staff' and user.staff %}&middot; {{ user.staff.department }}{% endif %}</p>
       <p class="profile-meta">
         Member since {{ user.date_joined|date:"Y" }} &middot; <span style="color:#10b981;">{% if user.is_active %}Active{% else %}Inactive{% endif %}</span>

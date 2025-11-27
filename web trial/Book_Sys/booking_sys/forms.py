@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from .models import (
     User, Student, Staff, Facility, Court, Slot, Booking, 
-    Blackout, FacilityBlackout, Availability, Notification, Announcement
+    Blackout, FacilityBlackout, Availability, Notification, Announcement, ContactMessage
 )
 from datetime import datetime, date, time
 import re
@@ -460,4 +460,18 @@ class AnnouncementForm(forms.ModelForm):
             'publish_date': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'expiry_date': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
             'is_featured': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+# Contact Message Form
+class ContactMessageForm(forms.ModelForm):
+    class Meta:
+        model = ContactMessage
+        fields = ('name', 'email', 'phone', 'subject', 'message')
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Your Full Name'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'your.email@university.edu'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+1 (555) 123-4567', 'required': False}),
+            'subject': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'What is this about?'}),
+            'message': forms.Textarea(attrs={'class': 'form-control', 'rows': 6, 'placeholder': 'Please describe your inquiry or issue...'}),
         }

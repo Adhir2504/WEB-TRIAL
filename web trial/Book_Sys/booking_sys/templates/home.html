@@ -28,12 +28,12 @@
 </div>
 
 <!-- Hero / banner -->
-<section class="hero">
+<section class="hero" {% if site_settings.hero_image_url %}style="background-image: linear-gradient(135deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.35) 100%), url('{{ site_settings.hero_image_url }}');"{% endif %}>
   <div class="hero-content">
     <p class="hero-tag">WELCOME TO UNIBOOK.</p>
-    <h1>Reserve football, volleyball and badminton courts instantly.</h1>
+    <h1>{{ site_settings.hero_title }}</h1>
     <p class="hero-subtitle">
-      No more waiting in line or dealing with paper schedules. Book, manage and track your facility usage online.
+      {{ site_settings.hero_subtitle }}
     </p>
     <div class="hero-actions">
         <a href="{% url 'booking_sys:facilities' %}" class="btn btn-primary">Browse Facilities</a>
@@ -47,22 +47,25 @@
 <!-- Overview of facilities / available slots -->
 <section class="section">
   <div class="section-header">
-    <h2>Top 3 Most Liked Facilities</h2>
+    <h2>Top 3 Most Booked This Week</h2>
     <p>Check out the most popular facilities on campus and quickly book your slot.</p>
   </div>
 
   <div class="card-grid">
     {% if facilities %}
-      {% for facility in facilities|slice:":3" %}
+      {% for facility in facilities %}
         <article class="facility-card">
           <div class="facility-image {{ facility.facility_type }}-bg" 
                {% if facility.image_url %}
                  style="background-image: url('{{ facility.image_url }}');"
                {% endif %}>
-          </div>
-          <div class="facility-body">
-            <div class="facility-header">
-              <h3>{{ facility.facility_name|upper }}</h3>
+            <!-- Badge overlay for status and popularity -->
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem;">
+              {% if forloop.first %}
+                <span class="badge" style="background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #fff;">Most Popular</span>
+              {% else %}
+                <span style="width: 0;"></span>
+              {% endif %}
               {% if facility.facility_status == 'available' %}
                 <span class="badge" style="background:#16a34a;color:#fff;">Available</span>
               {% elif facility.facility_status == 'maintenance' %}
@@ -71,12 +74,17 @@
                 <span class="badge badge-danger">Closed</span>
               {% endif %}
             </div>
+          </div>
+          <div class="facility-body">
+            <div class="facility-header">
+              <h3>{{ facility.facility_name|upper }}</h3>
+            </div>
             <p class="facility-meta">@ {{ facility.location }} &bull; {{ facility.get_facility_type_display }}</p>
             <p class="facility-text">
               {{ facility.description|default:"No description available."|truncatewords:15 }}
             </p>
             <ul class="facility-tags">
-              <li>❤️ {{ facility.likes_count }} likes</li>
+              <li>📊 {{ facility.bookings_this_week }} bookings this week</li>
               <li>{{ facility.get_facility_type_display }} facility</li>
               <li>{{ facility.get_facility_status_display }}</li>
             </ul>
@@ -92,11 +100,15 @@
     {% else %}
       <!-- Default sample facilities if database is empty -->
       <article class="facility-card">
-        <div class="facility-image futsal-bg"></div>
+        <div class="facility-image futsal-bg">
+          <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem;">
+            <span style="width: 0;"></span>
+            <span class="badge" style="background:#16a34a;color:#fff;">Available</span>
+          </div>
+        </div>
         <div class="facility-body">
           <div class="facility-header">
             <h3>FUTSAL</h3>
-            <span class="badge" style="background:#16a34a;color:#fff;">Available</span>
           </div>
           <p class="facility-meta">@ Gymnasium &bull; Sports</p>
           <p class="facility-text">
@@ -120,26 +132,26 @@
 <section class="section">
   <div class="section-header centered">
     <h2>Quick Access</h2>
-    <p>Everything you need to manage your gym experience in one place.</p>
+    <p>Essential tools to manage your facility bookings and stay informed.</p>
   </div>
 
   <div class="pill-grid">
     <article class="pill-card">
       <h3>User Profile</h3>
-      <p>Manage your account, view user preferences and booking history.</p>
+      <p>Manage your account, view user preferences and edit your personal information.</p>
       <a href="{% url 'booking_sys:profile' %}" class="btn btn-soft">Go to Profile</a>
     </article>
 
     <article class="pill-card">
-      <h3>All Courts</h3>
-      <p>Browse available courts, check schedules and view facility details.</p>
-      <a href="{% url 'booking_sys:facilities' %}" class="btn btn-soft">See facilities</a>
+      <h3>Browse Facilities</h3>
+      <p>Explore all available facilities, check schedules and view detailed information.</p>
+      <a href="{% url 'booking_sys:facilities' %}" class="btn btn-soft">See All Facilities</a>
     </article>
 
     <article class="pill-card">
-      <h3>Book a Court</h3>
-      <p>Reserve your spot for football, badminton, volleyball and more.</p>
-      <a href="{% url 'booking_sys:facilities' %}" class="btn btn-soft">Start booking</a>
+      <h3>Support & Help</h3>
+      <p>Need assistance? Contact support or find answers to frequently asked questions.</p>
+      <a href="{% url 'booking_sys:contact' %}" class="btn btn-soft">Get Help</a>
     </article>
   </div>
 </section>
@@ -181,7 +193,7 @@
 </section>
 
 <script>
-// Auto-hide announcement banners after 15 seconds
+// Auto-hide announcement banners after 7 seconds
 document.addEventListener('DOMContentLoaded', function() {
   setTimeout(function() {
     const banners = document.querySelectorAll('.announcement-banner');
@@ -192,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
         banner.style.display = 'none';
       }, 500); // Wait for fade animation to complete
     });
-  }, 15000); // 15 seconds
+  }, 7000); // 7 seconds
 });
 </script>
 

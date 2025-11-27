@@ -7,7 +7,7 @@ from django.utils.safestring import mark_safe
 from django import forms
 from .models import (
     User, Student, Staff, Facility, Court, Slot, Booking, 
-    Blackout, FacilityBlackout, Availability, Notification, AuditLog, Announcement
+    Blackout, FacilityBlackout, Availability, Notification, AuditLog, Announcement, ContactMessage, SiteSettings
 )
 
 
@@ -770,6 +770,101 @@ class AnnouncementAdmin(admin.ModelAdmin):
         updated = queryset.update(is_featured=False)
         self.message_user(request, f'{updated} announcement(s) unmarked as featured.')
     unmark_as_featured.short_description = 'Unmark selected as featured'
+
+
+# ==================== CONTACT MESSAGE ADMIN ====================
+@admin.register(ContactMessage)
+class ContactMessageAdmin(admin.ModelAdmin):
+    list_display = ('subject', 'email', 'status', 'created_at', 'response_status')
+    list_filter = ('status', 'created_at')
+    search_fields = ('email', 'name', 'subject', 'message')
+    readonly_fields = ('contact_id', 'created_at', 'updated_at', 'user', 'name', 'email', 'phone', 'subject', 'message')
+    
+    fieldsets = (
+        ('Contact Information', {
+            'fields': ('contact_id', 'user', 'name', 'email', 'phone')
+        }),
+        ('Message', {
+            'fields': ('subject', 'message', 'created_at', 'updated_at')
+        }),
+        ('Response', {
+            'fields': ('status', 'admin_response')
+        }),
+    )
+    
+    actions = ['mark_as_read', 'mark_as_in_progress', 'mark_as_resolved']
+    
+    def response_status(self, obj):
+        """Display status with color coding"""
+        colors = {
+            'new': '#ef4444',
+            'read': '#f59e0b',
+            'in_progress': '#3b82f6',
+            'resolved': '#10b981',
+        }
+        return format_html(
+            '<span style="background: {}; color: white; padding: 0.25rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem;">{}</span>',
+            colors.get(obj.status, '#6b7280'),
+            obj.get_status_display()
+        )
+    response_status.short_description = 'Status'
+    
+    def mark_as_read(self, request, queryset):
+        updated = queryset.update(status='read')
+        self.message_user(request, f'{updated} message(s) marked as read.')
+    mark_as_read.short_description = 'Mark selected as read'
+    
+    def mark_as_in_progress(self, request, queryset):
+        updated = queryset.update(status='in_progress')
+        self.message_user(request, f'{updated} message(s) marked as in progress.')
+    mark_as_in_progress.short_description = 'Mark selected as in progress'
+    
+    def mark_as_resolved(self, request, queryset):
+        updated = queryset.update(status='resolved')
+        self.message_user(request, f'{updated} message(s) marked as resolved.')
+    mark_as_resolved.short_description = 'Mark selected as resolved'
+
+
+# ==================== SITE SETTINGS ADMIN ====================
+@admin.register(SiteSettings)
+class SiteSettingsAdmin(admin.ModelAdmin):
+    list_display = ('display_preview',)
+    readonly_fields = ('preview_image',)
+    
+    fieldsets = (
+        ('Hero Banner Image', {
+            'fields': ('hero_image_url', 'preview_image'),
+            'description': 'Enter a URL to an image. It will be displayed with a dark overlay for text readability.'
+        }),
+        ('Hero Banner Text', {
+            'fields': ('hero_title', 'hero_subtitle')
+        }),
+        ('Support Contact Information', {
+            'fields': ('support_email', 'support_phone'),
+            'description': 'Email and phone number displayed in the support/help section'
+        }),
+    )
+    
+    def preview_image(self, obj):
+        """Display a preview of the hero image"""
+        if obj.hero_image_url:
+            return format_html(
+                '<img src="{}" style="max-width: 500px; max-height: 300px; border-radius: 8px; margin-top: 10px;" />',
+                obj.hero_image_url
+            )
+        return "No image URL configured"
+    preview_image.short_description = "Image Preview"
+    
+    def display_preview(self, obj):
+        """Display in list view"""
+        if obj.hero_image_url:
+            return "✓ Hero image configured"
+        return "Default gradient (no image)"
+    display_preview.short_description = "Status"
+    
+    def has_add_permission(self, request):
+        """Only allow one instance"""
+        return not SiteSettings.objects.exists()
 
 
 # ==================== ADMIN SITE CUSTOMIZATION ====================

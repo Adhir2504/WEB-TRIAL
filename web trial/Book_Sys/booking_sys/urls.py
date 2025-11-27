@@ -16,6 +16,7 @@ urlpatterns = [
     
     # User profile (GET and POST)
     path('profile/', views.profile, name='profile'),
+    path('contact/', views.contact, name='contact'),
     
     # Booking management (GET and POST)
     path('booking/create/', views.create_booking, name='create_booking'),

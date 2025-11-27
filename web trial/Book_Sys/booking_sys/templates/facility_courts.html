@@ -605,7 +605,15 @@ function renderDateChangeCalendar() {
     const dayDiv = document.createElement('div');
     dayDiv.className = 'calendar-day';
     
-    if (currentDay < today) {
+    // Calculate 2-month boundaries
+    const twoMonthsAgo = new Date(today);
+    twoMonthsAgo.setDate(twoMonthsAgo.getDate() - 60);
+    
+    const twoMonthsLater = new Date(today);
+    twoMonthsLater.setDate(twoMonthsLater.getDate() + 60);
+    
+    // Disable if in the past or outside 2-month window
+    if (currentDay < today || currentDay < twoMonthsAgo || currentDay > twoMonthsLater) {
       dayDiv.classList.add('disabled');
     } else {
       const dateStr = formatDateForCalendar(currentDay);
@@ -646,6 +654,31 @@ function nextMonthDateChange() {
 }
 
 function selectDateChange(dateStr) {
+  // Validate 2-month booking window
+  const selectedDate = new Date(dateStr + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Calculate 2-month boundaries (60 days)
+  const twoMonthsAgo = new Date(today);
+  twoMonthsAgo.setDate(twoMonthsAgo.getDate() - 60);
+  
+  const twoMonthsLater = new Date(today);
+  twoMonthsLater.setDate(twoMonthsLater.getDate() + 60);
+  
+  // Check if selected date is within the 2-month window
+  if (selectedDate < twoMonthsAgo || selectedDate > twoMonthsLater) {
+    // Format dates for error message
+    const formatDate = (date) => {
+      const options = { year: 'numeric', month: 'long', day: 'numeric' };
+      return date.toLocaleDateString('en-US', options);
+    };
+    
+    const errorMessage = `❌ Bookings can only be made within 2 months from today.\n\nYou can book between ${formatDate(twoMonthsAgo)} and ${formatDate(twoMonthsLater)}.`;
+    alert(errorMessage);
+    return;
+  }
+  
   window.location.href = '/facility/' + facilitySlugForDateChange + '/courts/?date=' + dateStr;
 }
 

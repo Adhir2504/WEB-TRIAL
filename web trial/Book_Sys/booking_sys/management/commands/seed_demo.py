@@ -183,30 +183,43 @@ class Command(BaseCommand):
             )
 
     def _create_slots_for_facilities(self, facilities):
-        slot_blocks = [
-            (time(8, 0), time(10, 0)),
-            (time(10, 30), time(12, 30)),
-            (time(15, 0), time(17, 0)),
-            (time(18, 0), time(20, 0)),
+        """Create 1-hour slots from 8:00 AM to 6:00 PM for each facility"""
+        from datetime import datetime
+        
+        # Create hourly slots from 8:00 to 18:00 (8 AM to 6 PM)
+        slot_hours = [
+            (8, 9),    # 8:00-9:00
+            (9, 10),   # 9:00-10:00
+            (10, 11),  # 10:00-11:00
+            (11, 12),  # 11:00-12:00
+            (12, 13),  # 12:00-13:00 (Staff priority time)
+            (13, 14),  # 13:00-14:00
+            (14, 15),  # 14:00-15:00
+            (15, 16),  # 15:00-16:00
+            (16, 17),  # 16:00-17:00
+            (17, 18),  # 17:00-18:00
         ]
 
         for facility in facilities:
             for court in facility.courts.all():
-                for day in range(7):
+                for day in range(7):  # 0=Monday to 6=Sunday
+                    # Create availability for this day
                     Availability.objects.get_or_create(
                         court=court,
                         day_of_week=day,
                         defaults={
-                            "open_time": time(6, 0),
-                            "close_time": time(22, 0),
+                            "open_time": time(8, 0),
+                            "close_time": time(18, 0),
                         },
                     )
-                    for start, end in slot_blocks:
+                    
+                    # Create hourly slots
+                    for start_hour, end_hour in slot_hours:
                         Slot.objects.get_or_create(
                             court=court,
                             day_of_week=day,
-                            start_time=start,
-                            end_time=end,
+                            start_time=time(start_hour, 0),
+                            end_time=time(end_hour, 0),
                             defaults={"slot_type": "regular"},
                         )
 
@@ -219,7 +232,7 @@ class Command(BaseCommand):
         # Create bookings for next week (avoiding current week restriction)
         next_week_start = today + timedelta(days=7)
         
-        # Create a few sample bookings
+        # Create a few sample bookings with 1-hour slots
         booking_dates = [
             next_week_start,  # Monday next week
             next_week_start + timedelta(days=3),  # Thursday next week
@@ -233,15 +246,15 @@ class Command(BaseCommand):
             court = courts[0]
             booking_date = booking_dates.pop(0) if booking_dates else next_week_start
             
-            # Create a booking for 10:30 - 12:30
+            # Create a booking for 10:00 - 11:00 (1 hour slot)
             try:
                 Booking.objects.create(
                     user=user,
                     facility=facility,
                     court=court,
                     booking_date=booking_date,
-                    start_time=time(10, 30),
-                    end_time=time(12, 30),
+                    start_time=time(10, 0),
+                    end_time=time(11, 0),
                     notes=f"Demo booking for {court.court_name}",
                     status='confirmed'
                 )

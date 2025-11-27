@@ -26,11 +26,28 @@ from .forms import (
 def home(request):
     """Home page view - displays welcome page"""
     from django.utils import timezone
+    from django.db.models import Count
+    from datetime import timedelta
+    from .models import SiteSettings
     
-    facilities = Facility.objects.filter(facility_status='available').order_by('-likes_count')[:3]
+    # Get site settings
+    settings = SiteSettings.get_settings()
+    
+    # Get top 3 most booked facilities this week
+    now = timezone.now()
+    week_start = now - timedelta(days=now.weekday())  # Monday of current week
+    week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    facilities = Facility.objects.filter(
+        facility_status='available'
+    ).annotate(
+        bookings_this_week=Count(
+            'bookings',
+            filter=models.Q(bookings__booking_date__gte=week_start.date())
+        )
+    ).order_by('-bookings_this_week')[:3]
     
     # Get active announcements
-    now = timezone.now()
     announcements = Announcement.objects.filter(
         status='published'
     ).filter(
@@ -41,7 +58,8 @@ def home(request):
     
     return render(request, 'home.html', {
         'facilities': facilities,
-        'announcements': announcements
+        'announcements': announcements,
+        'site_settings': settings
     })
 
 
@@ -369,8 +387,8 @@ def register(request):
                 # Auto-login after registration
                 # Use the raw password before it was hashed
                 raw_password = form.cleaned_data.get('password1')
-                # Authenticate using the username
-                authenticated_user = authenticate(request, username=user.username, password=raw_password)
+                # Authenticate using the email (since USERNAME_FIELD is 'email')
+                authenticated_user = authenticate(request, username=user.email, password=raw_password)
                 
                 if authenticated_user is not None:
                     login(request, authenticated_user)
@@ -869,6 +887,18 @@ def api_get_available_slots(request, facility_id):
         if booking_date < timezone.localdate():
             return JsonResponse({'error': 'Cannot book for past dates'}, status=400)
         
+        # Check 2-month booking window constraint
+        today = timezone.localdate()
+        two_months_ago = today - timedelta(days=60)
+        two_months_later = today + timedelta(days=60)
+        
+        if booking_date < two_months_ago or booking_date > two_months_later:
+            return JsonResponse({
+                'error': f'Bookings can only be made within 2 months from today. '
+                         f'You can book between {two_months_ago.strftime("%B %d, %Y")} and {two_months_later.strftime("%B %d, %Y")}.',
+                'booking_window_exceeded': True
+            }, status=400)
+        
         # Check user's booking eligibility for this facility
         can_book, message = Booking.can_user_book(request.user, facility, booking_date)
         
@@ -925,7 +955,7 @@ def api_get_available_slots(request, facility_id):
             
             # Check which slots are actually available (not booked)
             available_slots = []
-            blackout_slots = []
+            restricted_slots = []
             for slot in slots:
                 is_available = Booking.is_slot_available(
                     court, booking_date, slot.start_time, slot.end_time
@@ -948,25 +978,40 @@ def api_get_available_slots(request, facility_id):
                         is_available = False
                         blackout_reason = blackout.reason
                 
-                if is_available:
-                    available_slots.append({
-                        'slot_id': str(slot.slot_id),
-                        'start_time': slot.start_time.strftime('%H:%M'),
-                        'end_time': slot.end_time.strftime('%H:%M'),
-                        'start_time_display': slot.start_time.strftime('%I:%M %p'),
-                        'end_time_display': slot.end_time.strftime('%I:%M %p'),
-                        'slot_type': slot.get_slot_type_display(),
+                # Check time slot restrictions based on user member type
+                time_allowed, time_message = Booking.check_time_slot_restriction(
+                    request.user, slot.start_time, slot.end_time
+                )
+                
+                slot_display = {
+                    'slot_id': str(slot.slot_id),
+                    'start_time': slot.start_time.strftime('%H:%M'),
+                    'end_time': slot.end_time.strftime('%H:%M'),
+                    'start_time_display': slot.start_time.strftime('%I:%M %p'),
+                    'end_time_display': slot.end_time.strftime('%I:%M %p'),
+                    'slot_type': slot.get_slot_type_display(),
+                }
+                
+                if is_available and time_allowed:
+                    # Slot is available and user is allowed to book it
+                    available_slots.append(slot_display)
+                elif is_available and not time_allowed:
+                    # Slot is available but user is restricted from booking it
+                    restricted_slots.append({
+                        **slot_display,
+                        'reason': time_message,
+                        'reason_type': 'time_restriction'
                     })
                 elif blackout_reason:
-                    blackout_slots.append({
-                        'start_time': slot.start_time.strftime('%H:%M'),
-                        'end_time': slot.end_time.strftime('%H:%M'),
-                        'start_time_display': slot.start_time.strftime('%I:%M %p'),
-                        'end_time_display': slot.end_time.strftime('%I:%M %p'),
-                        'reason': blackout_reason
+                    # Slot has a blackout
+                    restricted_slots.append({
+                        **slot_display,
+                        'reason': blackout_reason,
+                        'reason_type': 'blackout'
                     })
             
-            if available_slots or blackout_slots:
+            # Only add court if it has slots (available or restricted)
+            if available_slots or restricted_slots:
                 court_data = {
                     'court_id': str(court.court_id),
                     'court_name': court.court_name,
@@ -977,10 +1022,9 @@ def api_get_available_slots(request, facility_id):
                     'slots': available_slots,
                 }
                 
-                # Add blackout information if there are blackout slots
-                if blackout_slots:
-                    court_data['blackout_slots'] = blackout_slots
-                    court_data['has_blackouts'] = True
+                # Add restricted information if there are restricted slots
+                if restricted_slots:
+                    court_data['restricted_slots'] = restricted_slots
                 
                 courts_data.append(court_data)
         
@@ -1027,6 +1071,21 @@ def api_create_booking(request):
         except ValueError as e:
             return JsonResponse({'error': f'Invalid date/time format: {str(e)}'}, status=400)
         
+        # Check if date is in the past
+        if booking_date < timezone.localdate():
+            return JsonResponse({'error': 'Cannot book for past dates'}, status=400)
+        
+        # Check 2-month booking window constraint
+        today = timezone.localdate()
+        two_months_ago = today - timedelta(days=60)
+        two_months_later = today + timedelta(days=60)
+        
+        if booking_date < two_months_ago or booking_date > two_months_later:
+            return JsonResponse({
+                'error': f'Bookings can only be made within 2 months from today. '
+                         f'You can book between {two_months_ago.strftime("%B %d, %Y")} and {two_months_later.strftime("%B %d, %Y")}.'
+            }, status=400)
+        
         # Check for blackout periods
         start_datetime = datetime.combine(booking_date, start_time)
         end_datetime = datetime.combine(booking_date, end_time)
@@ -1066,6 +1125,13 @@ def api_create_booking(request):
         # Check if slot is still available
         if not Booking.is_slot_available(court, booking_date, start_time, end_time):
             return JsonResponse({'error': 'This time slot has already been booked'}, status=400)
+        
+        # Check time slot restrictions based on user member type
+        time_restriction_allowed, time_restriction_message = Booking.check_time_slot_restriction(
+            request.user, start_time, end_time
+        )
+        if not time_restriction_allowed:
+            return JsonResponse({'error': time_restriction_message}, status=400)
         
         # Check weekly limit (1 booking per facility per week)
         weekly_bookings = Booking.get_user_weekly_bookings(request.user, facility, booking_date)
@@ -1145,3 +1211,38 @@ def api_user_booking_status(request, facility_id):
         
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+# Contact page - GET and POST
+@require_http_methods(["GET", "POST"])
+def contact(request):
+    """Contact form page"""
+    from .forms import ContactMessageForm
+    from .models import ContactMessage, SiteSettings
+    
+    if request.method == 'POST':
+        form = ContactMessageForm(request.POST)
+        if form.is_valid():
+            contact_msg = form.save(commit=False)
+            # If user is logged in, associate the message with them
+            if request.user.is_authenticated:
+                contact_msg.user = request.user
+            contact_msg.save()
+            
+            messages.success(request, 'Thank you! Your message has been sent. Our support team will get back to you soon.')
+            return redirect('booking_sys:contact')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = ContactMessageForm()
+        # Pre-fill email if user is logged in
+        if request.user.is_authenticated:
+            form.fields['email'].initial = request.user.email
+            form.fields['name'].initial = f"{request.user.first_name} {request.user.last_name}"
+    
+    site_settings = SiteSettings.get_settings()
+    
+    return render(request, 'contact.html', {
+        'form': form,
+        'site_settings': site_settings
+    })
