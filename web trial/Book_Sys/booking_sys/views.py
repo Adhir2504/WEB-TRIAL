@@ -956,7 +956,27 @@ def api_get_available_slots(request, facility_id):
             # Check which slots are actually available (not booked)
             available_slots = []
             restricted_slots = []
+            expired_slots = []
+            
+            # Get current time for comparing against today's slots
+            current_time = timezone.localtime().time() if booking_date == timezone.localdate() else None
+            
             for slot in slots:
+                # Check if slot has already passed (only for today's bookings)
+                if current_time and slot.end_time <= current_time:
+                    # Slot has passed, add to expired slots
+                    expired_slots.append({
+                        'slot_id': str(slot.slot_id),
+                        'start_time': slot.start_time.strftime('%H:%M'),
+                        'end_time': slot.end_time.strftime('%H:%M'),
+                        'start_time_display': slot.start_time.strftime('%I:%M %p'),
+                        'end_time_display': slot.end_time.strftime('%I:%M %p'),
+                        'slot_type': slot.get_slot_type_display(),
+                        'reason': 'Time slot has already passed',
+                        'reason_type': 'expired'
+                    })
+                    continue
+                
                 is_available = Booking.is_slot_available(
                     court, booking_date, slot.start_time, slot.end_time
                 )
@@ -1011,7 +1031,7 @@ def api_get_available_slots(request, facility_id):
                     })
             
             # Only add court if it has slots (available or restricted)
-            if available_slots or restricted_slots:
+            if available_slots or restricted_slots or expired_slots:
                 court_data = {
                     'court_id': str(court.court_id),
                     'court_name': court.court_name,
@@ -1022,9 +1042,10 @@ def api_get_available_slots(request, facility_id):
                     'slots': available_slots,
                 }
                 
-                # Add restricted information if there are restricted slots
-                if restricted_slots:
-                    court_data['restricted_slots'] = restricted_slots
+                # Add restricted and expired information if there are restricted/expired slots
+                all_restricted = restricted_slots + expired_slots
+                if all_restricted:
+                    court_data['restricted_slots'] = all_restricted
                 
                 courts_data.append(court_data)
         
