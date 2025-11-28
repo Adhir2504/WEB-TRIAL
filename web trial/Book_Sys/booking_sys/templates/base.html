@@ -62,16 +62,17 @@
   <!-- Footer -->
   <footer class="site-footer">
     <div class="footer-inner">
-      <div>
-        <h4>UniBook</h4>
-        <p>Smart booking for university sports facilities.</p>
-      </div>
-      <div>
+      <div style="text-align: center;">
         <h5>Support</h5>
-        <p>Email: <a href="mailto:sport@university.edu">sport@university.edu</a></p>
-        <p>Phone: +230 123 4567</p>
+        {% if site_settings %}
+          <p>Email: <a href="mailto:{{ site_settings.support_email }}">{{ site_settings.support_email }}</a></p>
+          <p>Phone: <a href="tel:{{ site_settings.support_phone }}">{{ site_settings.support_phone }}</a></p>
+        {% else %}
+          <p>Email: <a href="mailto:support@unibook.edu">support@unibook.edu</a></p>
+          <p>Phone: <a href="tel:+230 800 1234">+230 800 1234</a></p>
+        {% endif %}
       </div>
-      <div>
+      <div style="text-align: center;">
         <h5>Contact Us</h5>
         <p>University of Mauritius<br />Reduit, Mauritius</p>
       </div>
