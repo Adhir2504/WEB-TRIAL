@@ -38,7 +38,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-     'booking_sys.apps.BookingSysConfig',
+    'rest_framework',
+    'rest_framework.authtoken',
+    'booking_sys.apps.BookingSysConfig',
 ]
 
 MIDDLEWARE = [
@@ -135,5 +137,14 @@ MEDIA_URL = '/media/'
 # Redirect to home URL after login (Default redirects to /accounts/profile/)
 LOGIN_REDIRECT_URL = '/'
 LOGIN_URL = '/login/'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

@@ -1,6 +1,39 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
+from .api import (
+    api_login, api_register, UserViewSet, StudentViewSet, StaffViewSet,
+    FacilityViewSet, CourtViewSet, AvailabilityViewSet, SlotViewSet,
+    BookingViewSet, BlackoutViewSet, FacilityBlackoutViewSet,
+    NotificationViewSet, AuditLogViewSet, AnnouncementViewSet,
+    ContactMessageViewSet, SiteSettingsViewSet,
+    mobile_facilities,
+    mobile_facility_detail,
+    mobile_slots,
+    mobile_create_booking,
+    mobile_my_bookings,
+    mobile_cancel_booking,
+    mobile_top_facilities,
+)
+
 app_name = 'booking_sys'
+router = DefaultRouter()
+router.register('users', UserViewSet)
+router.register('students', StudentViewSet)
+router.register('staff', StaffViewSet)
+router.register('facilities', FacilityViewSet)
+router.register('courts', CourtViewSet)
+router.register('availabilities', AvailabilityViewSet)
+router.register('slots', SlotViewSet)
+router.register('bookings', BookingViewSet)
+router.register('blackouts', BlackoutViewSet)
+router.register('facility-blackouts', FacilityBlackoutViewSet)
+router.register('notifications', NotificationViewSet)
+router.register('audit-logs', AuditLogViewSet)
+router.register('announcements', AnnouncementViewSet)
+router.register('contact-messages', ContactMessageViewSet)
+router.register('site-settings', SiteSettingsViewSet)
+
 urlpatterns = [
     # Public pages (GET only)
     path('', views.home, name='home'),
@@ -17,6 +50,7 @@ urlpatterns = [
     # User profile (GET and POST)
     path('profile/', views.profile, name='profile'),
     path('contact/', views.contact, name='contact'),
+    path("api/mobile/top-facilities/", mobile_top_facilities, name="mobile_top_facilities"),
     
     # Booking management (GET and POST)
     path('booking/create/', views.create_booking, name='create_booking'),
@@ -33,9 +67,21 @@ urlpatterns = [
     path('manage/facility-blackout/create/', views.create_facility_blackout, name='create_facility_blackout'),
     path('manage/availability/create/', views.create_availability, name='create_availability'),
     path('manage/announcement/create/', views.create_announcement, name='create_announcement'),
+    path('manage/ajax-facilities/', views.ajax_facilities, name='ajax_facilities'),
     
     # API endpoints for calendar booking
     path('api/facility/<uuid:facility_id>/slots/', views.api_get_available_slots, name='api_get_slots'),
     path('api/booking/create/', views.api_create_booking, name='api_create_booking'),
     path('api/facility/<uuid:facility_id>/user-status/', views.api_user_booking_status, name='api_user_status'),
+    
+    # DRF router and token auth endpoints
+    path('api/login/', api_login, name='api_login'),
+    path('api/register/', api_register, name='api_register'),
+    path('api/mobile/facilities/', mobile_facilities, name='mobile_facilities'),
+    path('api/mobile/facilities/<uuid:facility_id>/', mobile_facility_detail, name='mobile_facility_detail'),
+    path('api/mobile/facilities/<uuid:facility_id>/slots/', mobile_slots, name='mobile_slots'),
+    path('api/mobile/bookings/create/', mobile_create_booking, name='mobile_create_booking'),
+    path('api/mobile/bookings/', mobile_my_bookings, name='mobile_my_bookings'),
+    path('api/mobile/bookings/<uuid:booking_id>/cancel/', mobile_cancel_booking, name='mobile_cancel_booking'),
+    path('api/', include(router.urls)),
 ]

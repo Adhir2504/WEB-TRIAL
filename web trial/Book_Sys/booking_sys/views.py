@@ -296,6 +296,11 @@ def profile(request):
         })
 
 
+@login_required
+def ajax_facilities(request):
+    return render(request, 'ajax_facilities.html')
+
+
 # Login view - GET and POST
 @require_http_methods(["GET", "POST"])
 def login_view(request):

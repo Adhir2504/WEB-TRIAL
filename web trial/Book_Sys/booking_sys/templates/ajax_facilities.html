@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Facility AJAX Manager{% endblock %}
+
+{% block content %}
+  <section class="page-section">
+    <h1>Facility AJAX Dashboard</h1>
+    <p>Use this page to load facility data, create new facilities, edit existing records, and delete entries without reloading the page.</p>
+
+    <div id="api-status" class="alert alert-info" style="display: none; margin-bottom: 1rem;"></div>
+
+    <div class="card" style="margin-bottom: 1.5rem; padding: 1rem;">
+      <h2>Create New Facility</h2>
+      <form id="facility-create-form">
+        <div class="form-row">
+          <label for="facility-name">Name</label>
+          <input id="facility-name" type="text" name="facility_name" required />
+        </div>
+        <div class="form-row">
+          <label for="facility-type">Type</label>
+          <select id="facility-type" name="facility_type" required>
+            <option value="sports">Sports</option>
+            <option value="recreation">Recreation</option>
+            <option value="academic">Academic</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="facility-location">Location</label>
+          <input id="facility-location" type="text" name="location" required />
+        </div>
+        <div class="form-row">
+          <label for="facility-description">Description</label>
+          <textarea id="facility-description" name="description" rows="3"></textarea>
+        </div>
+        <div class="form-row">
+          <label for="facility-status">Status</label>
+          <select id="facility-status" name="facility_status" required>
+            <option value="available">Available</option>
+            <option value="maintenance">Under Maintenance</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Facility</button>
+      </form>
+    </div>
+
+    <div class="card" style="margin-bottom: 1.5rem; padding: 1rem; display:none;" id="update-section">
+      <h2>Edit Facility</h2>
+      <form id="facility-update-form">
+        <input type="hidden" id="facility-id" name="facility_id" />
+        <div class="form-row">
+          <label for="edit-facility-name">Name</label>
+          <input id="edit-facility-name" type="text" name="facility_name" required />
+        </div>
+        <div class="form-row">
+          <label for="edit-facility-type">Type</label>
+          <select id="edit-facility-type" name="facility_type" required>
+            <option value="sports">Sports</option>
+            <option value="recreation">Recreation</option>
+            <option value="academic">Academic</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label for="edit-facility-location">Location</label>
+          <input id="edit-facility-location" type="text" name="location" required />
+        </div>
+        <div class="form-row">
+          <label for="edit-facility-description">Description</label>
+          <textarea id="edit-facility-description" name="description" rows="3"></textarea>
+        </div>
+        <div class="form-row">
+          <label for="edit-facility-status">Status</label>
+          <select id="edit-facility-status" name="facility_status" required>
+            <option value="available">Available</option>
+            <option value="maintenance">Under Maintenance</option>
+            <option value="closed">Closed</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-secondary">Save Changes</button>
+        <button type="button" class="btn btn-outline" id="cancel-edit">Cancel</button>
+      </form>
+    </div>
+
+    <div class="card" style="padding: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Facilities</h2>
+        <button type="button" class="btn btn-outline" id="refresh-table">Reload Table</button>
+      </div>
+      <table id="facilities-table" class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Location</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script id="csrf-token" type="text/plain">{% csrf_token %}</script>
+  <script src="{% static 'js/ajax_facilities.js' %}"></script>
+{% endblock %}
