@@ -1,0 +1,41 @@
+<div class="visual-calendar">
+  <div class="visual-calendar-header">
+    <div>
+      <p class="calendar-label">This Month</p>
+      <h3>{{ current_month_label|default:"September 2025" }}</h3>
+    </div>
+    <div class="calendar-nav">
+      <a class="btn btn-soft" href="?day={{ selected_day_index|default:0 }}">Today</a>
+    </div>
+  </div>
+
+  <table class="visual-calendar-grid">
+    <thead>
+      <tr>
+        <th>Mon</th>
+        <th>Tue</th>
+        <th>Wed</th>
+        <th>Thu</th>
+        <th>Fri</th>
+        <th>Sat</th>
+        <th>Sun</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for week in calendar_weeks %}
+        <tr>
+          {% for day_data in week %}
+            {% if day_data.day %}
+              <td class="{% if day_data.is_today %}today{% endif %} {% if day_data.has_event %}has-event{% endif %}">
+                {{ day_data.day }}
+              </td>
+            {% else %}
+              <td class="muted-cell"></td>
+            {% endif %}
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+

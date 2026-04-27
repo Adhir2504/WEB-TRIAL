@@ -1,0 +1,814 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Facilities{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="section-header">
+    <h1>Book University Facilities</h1>
+    <p>Reserve recreational facilities and sports courts across campus. Stay active and make the most of your university experience.</p>
+  </div>
+
+  <!-- Search & filters -->
+  <div style="margin-bottom: 2rem;">
+  <form method="get" action="{% url 'booking_sys:search_facilities' %}">
+    <div class="filter-bar">
+      <div class="filter-field">
+        <label>Search facilities</label>
+        <div style="position: relative;">
+          <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);">🔍</span>
+          <input type="text" name="q" placeholder="Gym, Futsal, Badminton…" value="{{ query|default:'' }}" style="padding-left: 2.5rem;" />
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>Date</label>
+        <div style="position: relative;">
+          <span style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-muted);">📅</span>
+          <input type="date" name="date" style="padding-left: 2.5rem;" />
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>Facility type</label>
+        <select name="type">
+          <option value="">All types</option>
+          <option value="sports" {% if selected_type == 'sports' %}selected{% endif %}>Sports</option>
+          <option value="recreation" {% if selected_type == 'recreation' %}selected{% endif %}>Recreation</option>
+          <option value="academic" {% if selected_type == 'academic' %}selected{% endif %}>Academic</option>
+          <option value="other" {% if selected_type == 'other' %}selected{% endif %}>Other</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <button type="submit" class="btn btn-primary filter-btn" style="width: 100%;">Search Facilities</button>
+      </div>
+    </div>
+  </form>
+  </div>
+
+  <!-- Facilities grid -->
+  <div class="card-grid facilities-grid">
+    {% if facilities_data %}
+      {% for item in facilities_data %}
+        {% with facility=item.facility next_slot=item.next_slot capacity=item.capacity %}
+          <article class="facility-card">
+            <div class="facility-image-wrapper">
+              {% if facility.image_url %}
+                <img src="{{ facility.image_url }}"
+                     alt="{{ facility.facility_name }}"
+                     class="facility-card-image">
+              {% else %}
+                <div class="facility-image {{ facility.facility_type }}-bg"></div>
+              {% endif %}
+              <div class="facility-badge-overlay">
+                {% if item.facility_blackout and selected_date %}
+                  <span class="badge badge-unavailable">Unavailable</span>
+                {% elif facility.facility_status == 'available' %}
+                  <span class="badge badge-available">Available</span>
+                {% elif facility.facility_status == 'maintenance' %}
+                  <span class="badge badge-soon">Soon Available</span>
+                {% else %}
+                  <span class="badge badge-unavailable">Unavailable</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="facility-body">
+              <div class="facility-header">
+                <h3>{{ facility.facility_name|upper }}</h3>
+              </div>
+              <p class="facility-meta">{{ facility.location }} • {{ capacity|default:"N/A" }} People</p>
+              <p class="facility-text">
+                {{ facility.description|default:"A well-maintained facility for your sports and recreation needs."|truncatewords:20 }}
+              </p>
+              
+              {% if next_slot %}
+                <div class="facility-availability">
+                  <span style="font-size: 0.85rem; color: var(--text-muted);">
+                    Next available: 
+                    <strong style="color: var(--primary);">
+                      {% if next_slot.day_of_week == 0 %}Monday{% elif next_slot.day_of_week == 1 %}Tuesday{% elif next_slot.day_of_week == 2 %}Wednesday{% elif next_slot.day_of_week == 3 %}Thursday{% elif next_slot.day_of_week == 4 %}Friday{% elif next_slot.day_of_week == 5 %}Saturday{% else %}Sunday{% endif %} {{ next_slot.start_time|time:"g:i A" }} - {{ next_slot.end_time|time:"g:i A" }}
+                    </strong>
+                  </span>
+                </div>
+              {% else %}
+                <div class="facility-availability">
+                  <span style="font-size: 0.85rem; color: var(--text-muted);">
+                    Check availability for booking
+                  </span>
+                </div>
+              {% endif %}
+              
+              <div class="facility-features">
+                <span class="feature-icon">🏋️ Equipments</span>
+                <span class="feature-icon">🅿️ Free Parking</span>
+              </div>
+              
+              <!-- Facility-wide Blackout Warning -->
+              {% if item.facility_blackout and selected_date %}
+                <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem;">
+                  <div style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                    <span style="font-size: 1.2rem; flex-shrink: 0;">🚫</span>
+                    <div style="font-size: 0.85rem;">
+                      <strong style="color: #991b1b; display: block; margin-bottom: 0.25rem;">Facility Unavailable</strong>
+                      <span style="color: #b91c1c;">{{ item.facility_unavailable_during }}<br>📌 Reason: {{ item.facility_blackout.reason }}</span>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+              
+              <div class="facility-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <a href="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}" class="btn btn-outline" style="flex: 1; min-width: 120px;">View Details</a>
+                {% if facility.facility_status == 'available' and not item.facility_blackout %}
+                  <button class="btn btn-primary" onclick="openBookingModal('{{ facility.facility_name }}', '{{ facility.facility_name|slugify }}', '{{ facility.facility_id }}')" style="flex: 1; min-width: 120px;">Book Now</button>
+                {% else %}
+                  <button class="btn btn-disabled" disabled style="flex: 1; min-width: 120px;">Unavailable</button>
+                {% endif %}
+              </div>
+            </div>
+          </article>
+        {% endwith %}
+      {% endfor %}
+    {% else %}
+      <div style="grid-column: 1 / -1; text-align: center; padding: 2rem;">
+        <p>No facilities available at the moment. Please check back later.</p>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Booking Modal -->
+<div id="bookingModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalFacilityName">Select Booking Date</h2>
+      <button class="modal-close" onclick="closeBookingModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="calendar-section">
+        <div class="calendar-header">
+          <button onclick="previousMonth()" class="calendar-nav-btn">‹</button>
+          <h3 id="calendarMonth">Month Year</h3>
+          <button onclick="nextMonth()" class="calendar-nav-btn">›</button>
+        </div>
+        <div class="calendar-weekdays">
+          <div class="weekday">Sun</div>
+          <div class="weekday">Mon</div>
+          <div class="weekday">Tue</div>
+          <div class="weekday">Wed</div>
+          <div class="weekday">Thu</div>
+          <div class="weekday">Fri</div>
+          <div class="weekday">Sat</div>
+        </div>
+        <div id="calendarDays" class="calendar-days">
+          <!-- Days populated by JavaScript -->
+        </div>
+      </div>
+      <div class="booking-info">
+        <div id="dateSelection" class="date-selection">
+          <p class="info-text">👆 Select a date to view available courts</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display: flex; justify-content: center; gap: 1rem;">
+      <button class="btn btn-outline" onclick="closeBookingModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .facility-image-wrapper {
+    position: relative;
+    height: 180px;
+    overflow: hidden;
+  }
+  
+  .facility-image {
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+  }
+  /* NEW: actual image styling */
+  .facility-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .facility-badge-overlay {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+  
+  .badge-available {
+    background: #16a34a !important;
+    color: #ffffff !important;
+  }
+  
+  .badge-unavailable {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+  }
+  
+  .badge-soon {
+    background: #f59e0b !important;
+    color: #ffffff !important;
+  }
+  
+  .facility-availability {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    background: #f3f4f6;
+    border-radius: 8px;
+  }
+  
+  .facility-features {
+    display: flex;
+    gap: 0.75rem;
+    margin: 0.5rem 0;
+    flex-wrap: wrap;
+  }
+  
+  .feature-icon {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  
+  .btn-disabled {
+    background: #e5e7eb;
+    color: #9ca3af;
+    cursor: not-allowed;
+    border-color: #e5e7eb;
+  }
+  
+  .facilities-grid .facility-card {
+    min-height: 420px;
+  }
+  
+  .facility-body {
+    padding: 1rem;
+  }
+  
+  .facility-text {
+    margin: 0.5rem 0;
+    line-height: 1.5;
+    min-height: 3em;
+  }
+  
+  /* Modal Styles */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.2s ease;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideIn {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  
+  .modal-content {
+    background-color: white;
+    margin: 3% auto;
+    border-radius: 20px;
+    max-width: 900px;
+    width: 90%;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideIn 0.3s ease;
+  }
+  
+  .modal-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+  
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    line-height: 1;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+  
+  .modal-close:hover {
+    background: #f3f4f6;
+    color: var(--text-main);
+  }
+  
+  .modal-body {
+    padding: 1.5rem 2rem;
+    overflow-y: auto;
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+  
+  @media (max-width: 768px) {
+    .modal-body {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .modal-footer {
+    padding: 1rem 2rem;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  
+  /* Calendar Styles */
+  .calendar-section {
+    background: #f9fafb;
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  
+  .calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .calendar-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+  
+  .calendar-nav-btn {
+    background: white;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  
+  .calendar-nav-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  
+  .calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .weekday {
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 0.5rem 0;
+  }
+  
+  .calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.25rem;
+  }
+  
+  .calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    background: white;
+    border: 1px solid var(--border-subtle);
+    position: relative;
+  }
+  
+  .calendar-day:hover:not(.other-month):not(.past-day) {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+  }
+  
+  .calendar-day.other-month {
+    color: #d1d5db;
+    background: transparent;
+    border-color: transparent;
+    cursor: default;
+  }
+  
+  .calendar-day.today {
+    border-color: var(--primary);
+    font-weight: 600;
+  }
+  
+  .calendar-day.selected {
+    background: var(--primary);
+    color: white;
+    font-weight: 600;
+    border-color: var(--primary);
+  }
+  
+  .calendar-day.past-day {
+    color: #d1d5db;
+    cursor: not-allowed;
+    text-decoration: line-through;
+  }
+  
+  /* Booking Info Styles */
+  .booking-info {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .date-selection {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 50px;
+    padding: 1rem;
+    background: #f0f9ff;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border: 2px solid #3b82f6;
+  }
+  
+  .info-text {
+    color: #1e40af;
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  
+  .info-subtext {
+    color: #3b82f6;
+    text-align: center;
+    font-size: 0.9rem;
+    margin: 0.25rem 0 0 0;
+  }
+  
+  .courts-list h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+  }
+  
+  .selected-date-display {
+    color: var(--primary);
+    font-weight: 600;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+  }
+  
+  .court-item {
+    background: white;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .court-item h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+  }
+  
+  .court-meta-info {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+  
+  .slots-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .slot-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background: #f9fafb;
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+  
+  .slot-time-display {
+    font-weight: 500;
+  }
+  
+  .slot-book-btn {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.85rem;
+    border-radius: 6px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .slot-book-btn:hover {
+    background: var(--primary-dark);
+  }
+  
+  .no-courts-message {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2rem;
+  }
+</style>
+
+<script>
+let currentDate = new Date();
+let selectedDate = null;
+let facilitySlug = '';
+let facilityName = '';
+let currentFacilityId = '';
+
+function openBookingModal(name, slug, facilityId) {
+  facilitySlug = slug;
+  facilityName = name;
+  currentFacilityId = facilityId;
+  document.getElementById('modalFacilityName').textContent = name + ' - Select Date';
+  document.getElementById('bookingModal').style.display = 'block';
+  renderCalendar();
+}
+
+function closeBookingModal() {
+  document.getElementById('bookingModal').style.display = 'none';
+  selectedDate = null;
+  document.getElementById('dateSelection').style.display = 'flex';
+}
+
+window.onclick = function(event) {
+  const modal = document.getElementById('bookingModal');
+  if (event.target === modal) {
+    closeBookingModal();
+  }
+}
+
+function previousMonth() {
+  currentDate.setMonth(currentDate.getMonth() - 1);
+  renderCalendar();
+}
+
+function nextMonth() {
+  currentDate.setMonth(currentDate.getMonth() + 1);
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  document.getElementById('calendarMonth').textContent = 
+    monthNames[currentDate.getMonth()] + ' ' + currentDate.getFullYear();
+  
+  const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+  const prevLastDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0);
+  
+  const firstDayIndex = firstDay.getDay();
+  const lastDayDate = lastDay.getDate();
+  const prevLastDayDate = prevLastDay.getDate();
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  let daysHTML = '';
+  
+  // Previous month days
+  for (let i = firstDayIndex - 1; i >= 0; i--) {
+    daysHTML += `<div class="calendar-day other-month">${prevLastDayDate - i}</div>`;
+  }
+  
+  // Current month days
+  for (let day = 1; day <= lastDayDate; day++) {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+    date.setHours(0, 0, 0, 0);
+    
+    const isToday = date.getTime() === today.getTime();
+    const isPast = date < today;
+    const isSelected = selectedDate && date.getTime() === selectedDate.getTime();
+    
+    let classes = 'calendar-day';
+    if (isToday) classes += ' today';
+    if (isPast) classes += ' past-day';
+    if (isSelected) classes += ' selected';
+    
+    // Format date string manually to avoid timezone issues
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${dayStr}`;
+    
+    if (!isPast) {
+      daysHTML += `<div class="${classes}" onclick="selectDate('${dateStr}')">${day}</div>`;
+    } else {
+      daysHTML += `<div class="${classes}">${day}</div>`;
+    }
+  }
+  
+  // Next month days
+  const totalCells = daysHTML.match(/calendar-day/g).length;
+  const remainingCells = 42 - totalCells; // 6 rows × 7 days
+  for (let i = 1; i <= remainingCells; i++) {
+    daysHTML += `<div class="calendar-day other-month">${i}</div>`;
+  }
+  
+  document.getElementById('calendarDays').innerHTML = daysHTML;
+}
+
+function selectDate(dateStr) {
+  // Parse date string to avoid timezone issues
+  const parts = dateStr.split('-');
+  selectedDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  selectedDate.setHours(0, 0, 0, 0);
+  
+  // Redirect to facility courts page with selected date
+  if (facilitySlug && dateStr) {
+    window.location.href = '/facility/' + facilitySlug + '/courts/?date=' + dateStr;
+  }
+}
+
+function loadCourtsForDate(dateStr) {
+  // Parse date string to avoid timezone issues
+  const parts = dateStr.split('-');
+  const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  date.setHours(0, 0, 0, 0);
+  const dayOfWeek = (date.getDay() + 6) % 7; // Convert to Monday=0 format
+  
+  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const dayName = dayNames[dayOfWeek];
+  
+  const formattedDate = date.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  
+  document.getElementById('selectedDateDisplay').textContent = '📅 ' + formattedDate;
+  document.getElementById('dateSelection').style.display = 'none';
+  document.getElementById('courtsList').style.display = 'block';
+  document.getElementById('courtsContainer').innerHTML = '<div style="text-align:center;padding:2rem;color:#6b7280;"><div style="font-size:2rem;margin-bottom:0.5rem;">⏳</div>Loading available courts...</div>';
+  
+  // Fetch real data from server
+  const facilityId = facilitySlug; // We'll need to pass the actual ID
+  fetch(`/api/facility/${currentFacilityId}/slots/?date=${dateStr}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('courtsContainer').innerHTML = 
+          `<div class="no-courts-message" style="text-align:center;padding:2rem;"><div style="font-size:2rem;margin-bottom:0.5rem;">❌</div>${data.error}</div>`;
+        return;
+      }
+      
+      if (!data.can_book) {
+        document.getElementById('courtsContainer').innerHTML = 
+          `<div class="no-courts-message" style="text-align:center;padding:2rem;background:#fef3c7;border:2px solid #f59e0b;border-radius:12px;"><div style="font-size:2rem;margin-bottom:0.5rem;">⚠️</div><strong>Booking Limit Reached</strong><p style="margin:0.5rem 0 0 0;color:#92400e;">${data.message}</p></div>`;
+        return;
+      }
+      
+      let courtsHTML = '';
+      if (data.courts && data.courts.length > 0) {
+        data.courts.forEach(court => {
+          const slotsCount = court.slots.length;
+          courtsHTML += `
+            <div class="court-item">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <h4 style="margin:0;">${court.court_name}</h4>
+                <span style="background:#dbeafe;color:#1e40af;padding:0.25rem 0.5rem;border-radius:6px;font-size:0.75rem;font-weight:600;">${slotsCount} slot${slotsCount !== 1 ? 's' : ''} available</span>
+              </div>
+              <p class="court-meta-info">${court.sport_type} • Capacity: ${court.capacity} people</p>
+              <div class="slots-list">
+                ${court.slots.map(slot => `
+                  <div class="slot-item">
+                    <span class="slot-time-display">🕐 ${slot.start_time_display} - ${slot.end_time_display}</span>
+                    <button class="slot-book-btn" onclick="bookSlot('${court.court_id}', '${slot.slot_id}', '${slot.start_time}', '${slot.end_time}', '${court.court_name}')">
+                      Book Now
+                    </button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        });
+      } else {
+        courtsHTML = '<div class="no-courts-message" style="text-align:center;padding:2rem;background:#f3f4f6;border-radius:12px;"><div style="font-size:2rem;margin-bottom:0.5rem;">😔</div><strong>No Courts Available</strong><p style="margin:0.5rem 0 0 0;color:#6b7280;">All courts are booked for this date. Try selecting a different date.</p></div>';
+      }
+      
+      document.getElementById('courtsContainer').innerHTML = courtsHTML;
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      document.getElementById('courtsContainer').innerHTML = 
+        '<div class="no-courts-message">Error loading slots. Please try again.</div>';
+    });
+}
+
+function bookSlot(courtId, slotId, startTime, endTime, courtName) {
+  if (!confirm(`Book ${courtName} for ${startTime} - ${endTime}?`)) {
+    return;
+  }
+  
+  const bookingData = {
+    facility_id: currentFacilityId,
+    court_id: courtId,
+    booking_date: selectedDate.toISOString().split('T')[0],
+    start_time: startTime,
+    end_time: endTime,
+    notes: ''
+  };
+  
+  fetch('/api/booking/create/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify(bookingData)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.error) {
+      alert('Booking failed: ' + data.error);
+    } else {
+      alert('✅ ' + data.message + '\n\nFacility: ' + data.booking.facility + '\nCourt: ' + data.booking.court + '\nDate: ' + data.booking.date + '\nTime: ' + data.booking.time);
+      closeBookingModal();
+      window.location.href = '/profile/';
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Booking failed. Please try again.');
+  });
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// Initialize calendar when page loads
+if (document.getElementById('bookingModal')) {
+  currentDate = new Date();
+}
+</script>
+{% endblock %}

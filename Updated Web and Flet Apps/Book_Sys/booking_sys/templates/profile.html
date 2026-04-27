@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · My Profile{% endblock %}
+
+{% block content %}
+<section class="section profile-layout">
+  <!-- User summary -->
+  <div class="profile-header-card">
+    <div class="profile-avatar">{{ user.first_name|first|upper }}{{ user.last_name|first|upper }}</div>
+    <div>
+      <h1>{{ user.username|first|upper }}{{ user.username|slice:"1:"|lower }}</h1>
+      <p>{{ user.get_member_type_display }} {% if user.member_type == 'student' and user.student %}&middot; {{ user.student.student_id }}{% elif user.member_type == 'staff' and user.staff %}&middot; {{ user.staff.department }}{% endif %}</p>
+      <p class="profile-meta">
+        Member since {{ user.date_joined|date:"Y" }} &middot; <span style="color:#10b981;">{% if user.is_active %}Active{% else %}Inactive{% endif %}</span>
+      </p>
+    </div>
+    <div class="profile-actions">
+      <a href="#edit-profile" class="btn btn-outline" onclick="document.getElementById('edit-profile-section').scrollIntoView({behavior: 'smooth'});">Edit profile</a>
+      <a href="{% url 'booking_sys:home' %}" class="btn btn-soft">Back to booking</a>
+    </div>
+  </div>
+
+  <div class="profile-columns">
+    <!-- Left: bookings & favorites -->
+    <div class="profile-column">
+      <section class="card-section">
+        <h2>Upcoming bookings</h2>
+        {% if bookings %}
+          {% for booking in bookings %}
+            <div class="booking-list-item">
+              <div>
+                <h3>{{ booking.court.court_name }}</h3>
+                <p>{{ booking.booking_date|date:"M d, Y" }} &middot; {{ booking.start_time|time:"g:i A" }} – {{ booking.end_time|time:"g:i A" }} &middot; {{ booking.facility.facility_name }}</p>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Status: {{ booking.get_status_display }}</p>
+              </div>
+              <div>
+                <button onclick="viewBookingDetails('{{ booking.booking_id }}', '{{ booking.court.court_name }}', '{{ booking.facility.facility_name }}', '{{ booking.booking_date|date:"F d, Y" }}', '{{ booking.start_time|time:"g:i A" }}', '{{ booking.end_time|time:"g:i A" }}', '{{ booking.get_status_display }}', '{{ booking.notes|default:"No notes" }}', '{{ booking.created_at|date:"M d, Y g:i A" }}', '{{ booking.status }}')" class="btn btn-soft">View Details</button>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p style="color: var(--text-muted);">No bookings yet. <a href="{% url 'booking_sys:facilities' %}">Browse facilities</a> to make your first booking!</p>
+        {% endif %}
+      </section>
+
+      <section class="card-section" id="edit-profile-section">
+        <h2>Edit Profile</h2>
+        <form method="post" action="{% url 'booking_sys:profile' %}">
+          {% csrf_token %}
+          <input type="hidden" name="form_type" value="profile">
+          
+          <label class="form-label">First Name</label>
+          {{ profile_form.first_name }}
+          
+          <label class="form-label">Last Name</label>
+          {{ profile_form.last_name }}
+          
+          <label class="form-label">Email</label>
+          {{ profile_form.email }}
+          
+          <label class="form-label">Phone Number</label>
+          {{ profile_form.user_phone }}
+          
+          <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">Update Profile</button>
+        </form>
+
+        {% if user.member_type == 'student' %}
+          <div style="margin-top: 2rem;">
+            <h3>Student Profile</h3>
+            {% if student_form %}
+              <form method="post" action="{% url 'booking_sys:profile' %}">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="student">
+                
+                <label class="form-label">Student ID</label>
+                {{ student_form.student_id }}
+                
+                <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">
+                  {% if student_profile %}Update{% else %}Create{% endif %} Student Profile
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        {% elif user.member_type == 'staff' %}
+          <div style="margin-top: 2rem;">
+            <h3>Staff Profile</h3>
+            {% if staff_form %}
+              <form method="post" action="{% url 'booking_sys:profile' %}">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="staff">
+                
+                <label class="form-label">Department</label>
+                {{ staff_form.department }}
+                
+                <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">
+                  {% if staff_profile %}Update{% else %}Create{% endif %} Staff Profile
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        {% endif %}
+      </section>
+    </div>
+
+    <!-- Right: account & stats -->
+    <div class="profile-column">
+      <section class="card-section">
+        <h2>Account details</h2>
+        <dl class="profile-details">
+          <div>
+            <dt>Username</dt>
+            <dd>{{ user.username }}</dd>
+          </div>
+          <div>
+            <dt>Email</dt>
+            <dd>{{ user.email }}</dd>
+          </div>
+          <div>
+            <dt>Full Name</dt>
+            <dd>{{ user.first_name }} {{ user.last_name }}</dd>
+          </div>
+          {% if user.user_phone %}
+          <div>
+            <dt>Phone</dt>
+            <dd>{{ user.user_phone }}</dd>
+          </div>
+          {% endif %}
+          {% if user.member_type == 'student' and user.student %}
+          <div>
+            <dt>Student ID</dt>
+            <dd>{{ user.student.student_id }}</dd>
+          </div>
+          {% elif user.member_type == 'staff' and user.staff %}
+          <div>
+            <dt>Department</dt>
+            <dd>{{ user.staff.department }}</dd>
+          </div>
+          {% endif %}
+          <div>
+            <dt>Member Type</dt>
+            <dd>{{ user.get_member_type_display }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card-section">
+        <h2>Usage summary</h2>
+        <ul class="updates-list">
+          <li>Total bookings: <strong>{{ bookings|length }}</strong></li>
+          <li>Active bookings: <strong>{% for b in bookings %}{% if b.status == 'pending' or b.status == 'confirmed' %}1{% endif %}{% empty %}0{% endfor %}</strong></li>
+          <li>Member since: <strong>{{ user.date_joined|date:"M Y" }}</strong></li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</section>
+
+<!-- Booking Details Modal -->
+<div id="bookingModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);">
+  <div style="background-color: #fefefe; margin: 5% auto; padding: 0; border-radius: 12px; width: 90%; max-width: 600px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+    <div style="padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="margin: 0; font-size: 1.5rem;">Booking Details</h2>
+      <button onclick="closeBookingModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">&times;</button>
+    </div>
+    
+    <div style="padding: 1.5rem;">
+      <div style="margin-bottom: 1.5rem;">
+        <div style="display: grid; gap: 1rem;">
+          <div>
+            <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 0.25rem;">Booking ID</label>
+            <p id="modalBookingId" style="margin: 0; color: #6b7280; font-family: monospace;"></p>
+          </div>
+          
+          <div>
+            <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 0.25rem;">Facility</label>
+            <p id="modalFacility" style="margin: 0; color: #111827;"></p>
+          </div>
+          
+          <div>
+            <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 0.25rem;">Court</label>
+            <p id="modalCourt" style="margin: 0; color: #111827;"></p>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div>
+              <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 0.25rem;">Date</label>
+              <p id="modalDate" style="margin: 0; color: #111827;"></p>
+            </div>
+            <div>
+              <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 0.25rem;">Time</label>
+              <p id="modalTime" style="margin: 0; color: #111827;"></p>
+            </div>
+          </div>
+          
+          <div>
+            <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 0.25rem;">Status</label>
+            <p id="modalStatus" style="margin: 0;"></p>
+          </div>
+          
+          <div>
+            <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 0.25rem;">Notes</label>
+            <p id="modalNotes" style="margin: 0; color: #6b7280; font-style: italic;"></p>
+          </div>
+          
+          <div>
+            <label style="font-weight: 600; color: #374151; display: block; margin-bottom: 0.25rem;">Booked On</label>
+            <p id="modalCreatedAt" style="margin: 0; color: #6b7280; font-size: 0.875rem;"></p>
+          </div>
+        </div>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
+        <form id="modalCancelForm" method="post" style="display: none; margin: 0;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline" style="background-color: #fee2e2; color: #dc2626; border-color: #dc2626;" onclick="return confirm('Are you sure you want to cancel this booking?');">Cancel Booking</button>
+        </form>
+        <div style="margin-left: auto; display: flex; gap: 0.5rem;">
+          <button onclick="closeBookingModal()" class="btn btn-outline">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function viewBookingDetails(bookingId, court, facility, date, startTime, endTime, status, notes, createdAt, rawStatus) {
+  document.getElementById('modalBookingId').textContent = bookingId;
+  document.getElementById('modalFacility').textContent = facility;
+  document.getElementById('modalCourt').textContent = court;
+  document.getElementById('modalDate').textContent = date;
+  document.getElementById('modalTime').textContent = startTime + ' - ' + endTime;
+  document.getElementById('modalNotes').textContent = notes;
+  document.getElementById('modalCreatedAt').textContent = createdAt;
+  
+  // Style status based on value
+  const statusElement = document.getElementById('modalStatus');
+  statusElement.textContent = status;
+  if (status.toLowerCase() === 'confirmed') {
+    statusElement.style.color = '#059669';
+    statusElement.style.fontWeight = '600';
+  } else if (status.toLowerCase() === 'pending') {
+    statusElement.style.color = '#d97706';
+    statusElement.style.fontWeight = '600';
+  } else if (status.toLowerCase() === 'cancelled') {
+    statusElement.style.color = '#dc2626';
+    statusElement.style.fontWeight = '600';
+  } else {
+    statusElement.style.color = '#6b7280';
+  }
+  
+  // Show/hide cancel button based on status
+  const cancelForm = document.getElementById('modalCancelForm');
+  if (rawStatus === 'pending' || rawStatus === 'confirmed') {
+    cancelForm.style.display = 'block';
+    cancelForm.action = "{% url 'booking_sys:cancel_booking' '00000000-0000-0000-0000-000000000000' %}".replace('00000000-0000-0000-0000-000000000000', bookingId);
+  } else {
+    cancelForm.style.display = 'none';
+  }
+  
+  document.getElementById('bookingModal').style.display = 'block';
+}
+
+function closeBookingModal() {
+  document.getElementById('bookingModal').style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+  const modal = document.getElementById('bookingModal');
+  if (event.target === modal) {
+    closeBookingModal();
+  }
+}
+</script>
+
+{% endblock %}

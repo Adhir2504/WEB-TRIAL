@@ -1,0 +1,873 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · {{ facility.facility_name }} Courts{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div class="section-header">
+    <h1>{{ facility.facility_name }}</h1>
+    {% if selected_date %}
+      <p>Available courts for <strong>{{ selected_date|date:"l, F d, Y" }}</strong></p>
+    {% else %}
+      <p>Select a date to view available courts and book your slot</p>
+    {% endif %}
+  </div>
+
+  <!-- Date Selection Card -->
+  {% if not selected_date %}
+  <div style="max-width: 600px; margin: 0 auto 3rem;">
+    <div class="card-section" style="text-align: center; padding: 2rem;">
+      <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📅</div>
+      <h2 style="margin: 0 0 0.5rem 0; font-size: 1.5rem;">Select a Date</h2>
+      <p style="color: #6b7280; margin-bottom: 1rem; font-size: 0.9rem;">Choose a date to view available courts and time slots</p>
+      <form method="get" action="" style="max-width: 100%;">
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <input type="date" name="date" class="form-control" required min="{{ today|date:'Y-m-d' }}" style="flex: 1; min-width: 0;">
+          <button type="submit" class="btn btn-primary" style="white-space: nowrap; padding: 0.625rem 1rem;">View Courts</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Courts Grid -->
+  {% if selected_date %}
+    <!-- Booking Status Alert -->
+    {% if user.is_authenticated and user_booking_status %}
+      <div class="card-section" style="margin-bottom: 2rem; padding: 1.25rem 1.5rem; {% if not user_booking_status.can_book_this_week or not user_booking_status.can_book_this_month %}background: #fef2f2; border-left: 4px solid #dc2626;{% else %}background: #f0f9ff; border-left: 4px solid #0891b2;{% endif %}">
+        <h3 style="margin: 0 0 0.5rem 0; font-size: 1rem;">
+          {% if not user_booking_status.can_book_this_week %}
+            ⚠️ Weekly Booking Limit Reached
+          {% elif not user_booking_status.can_book_this_month %}
+            ⚠️ Monthly Booking Limit Reached
+          {% else %}
+            ℹ️ Your Booking Status
+          {% endif %}
+        </h3>
+        <p style="margin: 0; color: #374151; font-size: 0.9rem;">
+          <strong>This Week:</strong> {{ user_booking_status.weekly_count }} / {{ user_booking_status.weekly_limit }} booking{{ user_booking_status.weekly_count|pluralize }} used
+          <span style="margin: 0 0.5rem;">•</span>
+          <strong>This Month:</strong> {{ user_booking_status.monthly_count }} / {{ user_booking_status.monthly_limit }} bookings used
+        </p>
+        {% if not user_booking_status.can_book_this_week %}
+          <p style="margin: 0.5rem 0 0 0; color: #991b1b; font-size: 0.85rem;">
+            You have already booked this facility once this week. Please try again next week.
+          </p>
+        {% elif not user_booking_status.can_book_this_month %}
+          <p style="margin: 0.5rem 0 0 0; color: #991b1b; font-size: 0.85rem;">
+            You have reached the maximum of 4 bookings per month for this facility. Please try again next month.
+          </p>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if court_data %}
+      <div style="margin-bottom: 2rem; padding-top: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div style="color: #6b7280; font-size: 0.9rem;">
+          Showing {{ court_data|length }} available court{{ court_data|length|pluralize }}
+        </div>
+        <button onclick="openDateChangeModal()" class="btn btn-outline" style="display: flex; align-items: center; gap: 0.5rem;">
+          📅 Change Date
+        </button>
+      </div>
+
+      <div class="card-grid facilities-grid">
+        {% for item in court_data %}
+          {% with court=item.court slots=item.slots slot_count=item.slot_count %}
+            <article class="facility-card">
+              <div class="facility-image-wrapper">
+                {% if court.image_url %}
+                  <img src="{{ court.image_url }}" alt="{{ court.court_name }}" class="facility-card-image">
+                {% else %}
+                  <div class="facility-image sports-bg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 4rem;">
+                    🏟️
+                  </div>
+                {% endif %}
+                <div class="facility-badge-overlay">
+                  <span class="badge badge-available">{{ slot_count }} slot{{ slot_count|pluralize }}</span>
+                </div>
+              </div>
+              
+              <div class="facility-body">
+                <div class="facility-header">
+                  <h3>{{ court.court_name }}</h3>
+                </div>
+                <p class="facility-meta">{{ court.sport_type }} • {{ court.capacity }} People</p>
+                <p class="facility-text">
+                  {{ court.notes|default:"Professional-grade court with modern facilities. Perfect for competitive games and practice sessions."|truncatewords:20 }}
+                </p>
+                
+                <div class="facility-availability" style="margin-top: 1rem;">
+                  <p style="font-size: 0.85rem; color: #6b7280; margin-bottom: 0.5rem;">
+                    <strong>📅 {{ selected_date|date:"l, M d" }}</strong>
+                  </p>
+                  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+                    {% for slot in slots|slice:":3" %}
+                      <span style="background: #f3f4f6; padding: 0.25rem 0.5rem; border-radius: 6px; font-size: 0.8rem; color: #374151;">
+                        ⏰ {{ slot.start_time|time:"g:i A" }}
+                      </span>
+                    {% endfor %}
+                    {% if slot_count > 3 %}
+                      <span style="color: #6b7280; font-size: 0.8rem;">+{{ slot_count|add:"-3" }} more</span>
+                    {% endif %}
+                  </div>
+                </div>
+                
+                <button class="btn btn-primary book-court-btn" style="width: 100%;"
+                        data-court-id="{{ court.court_id }}"
+                        data-court-name="{{ court.court_name }}"
+                        data-sport-type="{{ court.sport_type }}"
+                        data-capacity="{{ court.capacity }}"
+                        data-image-url="{{ court.image_url|default:'' }}"
+                        data-notes="{{ court.notes|default:'Professional court with modern facilities' }}">
+                  📅 View & Book Slots
+                </button>
+              </div>
+            </article>
+          {% endwith %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="card-section" style="text-align: center; max-width: 600px; margin: 0 auto;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">😔</div>
+        <h2 style="margin: 0 0 0.5rem 0;">No Courts Available</h2>
+        <p style="color: #6b7280; margin-bottom: 1.5rem;">
+          All courts are booked for {{ selected_date|date:"F d, Y" }}. Please try selecting a different date.
+        </p>
+        <a href="{% url 'booking_sys:facility_courts' facility.facility_name|slugify %}" class="btn btn-primary">
+          ← Select Different Date
+        </a>
+      </div>
+    {% endif %}
+  {% endif %}
+</section>
+
+<!-- Date Change Modal -->
+<div id="dateChangeModal" class="modal" style="display: none;">
+  <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-header">
+      <h2 style="margin: 0;">Change Booking Date</h2>
+      <button class="modal-close" onclick="closeDateChangeModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 1.5rem;">
+      <p style="color: #6b7280; margin-bottom: 1rem; text-align: center;">Select a new date to view available courts</p>
+      
+      <!-- Calendar -->
+      <div class="calendar-container" style="margin-bottom: 1.5rem;">
+        <div class="calendar-header">
+          <button type="button" onclick="previousMonthDateChange()" class="calendar-nav-btn">‹</button>
+          <h3 id="dateChangeCalendarMonth">Month Year</h3>
+          <button type="button" onclick="nextMonthDateChange()" class="calendar-nav-btn">›</button>
+        </div>
+        <div class="calendar-weekdays">
+          <div class="weekday">Sun</div>
+          <div class="weekday">Mon</div>
+          <div class="weekday">Tue</div>
+          <div class="weekday">Wed</div>
+          <div class="weekday">Thu</div>
+          <div class="weekday">Fri</div>
+          <div class="weekday">Sat</div>
+        </div>
+        <div id="dateChangeCalendarDays" class="calendar-days">
+          <!-- Days populated by JavaScript -->
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 0.5rem; justify-content: center;">
+        <button type="button" onclick="closeDateChangeModal()" class="btn btn-outline">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Booking Modal -->
+<div id="bookingModal" class="modal" style="display: none;">
+  <div class="modal-content" style="max-width: 800px;">
+    <div class="modal-header">
+      <div>
+        <h2 id="modalCourtName" style="margin: 0;">Court Name</h2>
+        <p id="modalCourtMeta" style="margin: 0.25rem 0 0 0; color: #6b7280; font-size: 0.9rem;"></p>
+      </div>
+      <button class="modal-close" onclick="closeBookingModal()">&times;</button>
+    </div>
+    
+    <div class="modal-body" style="padding: 1.5rem;">
+      <!-- Court Image & Info -->
+      <div style="display: grid; grid-template-columns: 180px 1fr; gap: 1.25rem; margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid #e5e7eb;">
+        <div id="modalCourtImageContainer" style="border-radius: 12px; overflow: hidden; width: 180px; height: 120px; flex-shrink: 0;">
+          <img id="modalCourtImage" src="" alt="" style="width: 100%; height: 100%; object-fit: cover;">
+        </div>
+        <div>
+          <p id="modalCourtDescription" style="color: #6b7280; margin: 0 0 0.75rem 0; font-size: 0.95rem;"></p>
+          <div style="display: flex; gap: 1rem;">
+            <span style="background: #f3f4f6; padding: 0.5rem 0.75rem; border-radius: 8px; font-size: 0.85rem;">
+              📅 {{ selected_date|date:"l, M d, Y" }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Available Slots -->
+      <h3 style="margin: 0 0 1rem 0; font-size: 1.1rem;">Available Time Slots</h3>
+      <div id="modalSlotsList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.75rem;">
+        <!-- Slots will be inserted here -->
+      </div>
+      
+      <input type="hidden" id="modalCourtId" />
+      <input type="hidden" id="modalCourtNameHidden" />
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+  .facility-image-wrapper {
+    position: relative;
+    height: 180px;
+    overflow: hidden;
+    border-radius: 12px 12px 0 0;
+  }
+  
+  .facility-image {
+    width: 100%;
+    height: 180px;
+    background-size: cover;
+    background-position: center;
+  }
+  
+  .facility-card-image {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    display: block;
+  }
+  
+  .facility-badge-overlay {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+  
+  .badge-available {
+    background: #d1fae5;
+    color: #065f46;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-in;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .modal-content {
+    background-color: var(--surface);
+    border-radius: 24px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(50px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.5rem 1.5rem 0 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+  }
+
+  .modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    line-height: 1;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+
+  .modal-close:hover {
+    background: var(--border-color);
+    color: var(--text-primary);
+  }
+
+  .slot-pill {
+    background: #f9fafb;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  .slot-pill:hover {
+    border-color: #667eea;
+    background: #f0f4ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+  }
+
+  .slot-pill:active {
+    transform: translateY(0);
+  }
+
+  .badge-available {
+    background: #d1fae5;
+    color: #065f46;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  /* Calendar Styles */
+  .calendar-container {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 1rem;
+  }
+
+  .calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0 0.5rem;
+  }
+
+  .calendar-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .calendar-nav-btn {
+    background: #f3f4f6;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    font-size: 1.5rem;
+    color: #374151;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .calendar-nav-btn:hover {
+    background: #e5e7eb;
+    color: #111827;
+  }
+
+  .calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 0.5rem;
+  }
+
+  .weekday {
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6b7280;
+    padding: 0.5rem 0;
+  }
+
+  .calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+
+  .calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, transform 0.1s;
+    color: #111827;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    min-height: 40px;
+  }
+
+  .calendar-day:hover:not(.disabled):not(.inactive) {
+    background: #f3f4f6;
+    transform: scale(1.05);
+  }
+
+  .calendar-day.inactive {
+    color: #d1d5db;
+    background: transparent;
+    border: none;
+    cursor: default;
+  }
+
+  .calendar-day.disabled {
+    color: #d1d5db;
+    cursor: not-allowed;
+    background: #f9fafb;
+    text-decoration: line-through;
+  }
+
+  .calendar-day.today {
+    border: 2px solid #0f766e;
+    font-weight: 600;
+  }
+
+  .calendar-day.selected {
+    background: #0f766e;
+    color: #ffffff;
+    border: 2px solid #0f766e;
+    font-weight: 600;
+  }
+
+  .calendar-day.selected:hover {
+    background: #0d5f57;
+    transform: scale(1.05);
+  }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const selectedDate = '{{ date_str }}';
+const facilityId = '{{ facility.facility_id }}';
+
+// Add event listeners for all book buttons
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM Content Loaded - Setting up button listeners');
+  const bookButtons = document.querySelectorAll('.book-court-btn');
+  console.log('Found', bookButtons.length, 'book buttons');
+  
+  bookButtons.forEach(button => {
+    button.addEventListener('click', function(e) {
+      e.preventDefault();
+      console.log('Book button clicked');
+      const courtId = this.dataset.courtId;
+      const courtName = this.dataset.courtName;
+      const sportType = this.dataset.sportType;
+      const capacity = this.dataset.capacity;
+      const imageUrl = this.dataset.imageUrl;
+      const notes = this.dataset.notes;
+      console.log('Opening modal for court:', courtName);
+      openBookingModal(courtId, courtName, sportType, capacity, imageUrl, notes);
+    });
+  });
+});
+
+function openBookingModal(courtId, courtName, sportType, capacity, imageUrl, notes) {
+  const modal = document.getElementById('bookingModal');
+  document.getElementById('modalCourtName').textContent = courtName;
+  document.getElementById('modalCourtMeta').textContent = `${sportType} • ${capacity} People`;
+  document.getElementById('modalCourtId').value = courtId;
+  document.getElementById('modalCourtNameHidden').value = courtName;
+  document.getElementById('modalCourtDescription').textContent = notes;
+  
+  // Handle image
+  const imageContainer = document.getElementById('modalCourtImageContainer');
+  const imageElement = document.getElementById('modalCourtImage');
+  if (imageUrl && imageUrl !== 'None' && imageUrl !== '') {
+    imageContainer.innerHTML = '';
+    imageElement.src = imageUrl;
+    imageElement.alt = courtName;
+    imageElement.style.display = 'block';
+    imageContainer.appendChild(imageElement);
+  } else {
+    imageContainer.innerHTML = '<div style="width:180px;height:120px;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);display:flex;align-items:center;justify-content:center;color:white;font-size:2.5rem;border-radius:12px;">🏟️</div>';
+  }
+  
+  // Load slots for this court
+  loadCourtSlots(courtId);
+  
+  modal.style.display = 'flex';
+}
+
+function closeBookingModal() {
+  document.getElementById('bookingModal').style.display = 'none';
+}
+
+// Date Change Calendar Variables
+let dateChangeCurrentDate = new Date();
+let dateChangeSelectedDate = null;
+const facilitySlugForDateChange = '{{ facility.facility_name|slugify }}';
+
+function openDateChangeModal() {
+  console.log('Opening date change modal');
+  const modal = document.getElementById('dateChangeModal');
+  const currentDate = '{{ date_str }}';
+  console.log('Current date:', currentDate);
+  if (currentDate) {
+    dateChangeCurrentDate = new Date(currentDate + 'T00:00:00');
+    dateChangeSelectedDate = currentDate;
+  } else {
+    dateChangeCurrentDate = new Date();
+    dateChangeSelectedDate = null;
+  }
+  renderDateChangeCalendar();
+  modal.style.display = 'flex';
+  console.log('Date change modal opened');
+}
+
+function closeDateChangeModal() {
+  document.getElementById('dateChangeModal').style.display = 'none';
+}
+
+function renderDateChangeCalendar() {
+  const year = dateChangeCurrentDate.getFullYear();
+  const month = dateChangeCurrentDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const prevLastDay = new Date(year, month, 0);
+  
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  document.getElementById('dateChangeCalendarMonth').textContent = `${monthNames[month]} ${year}`;
+  
+  const daysContainer = document.getElementById('dateChangeCalendarDays');
+  daysContainer.innerHTML = '';
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Previous month days
+  const firstDayOfWeek = firstDay.getDay();
+  for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+    const day = prevLastDay.getDate() - i;
+    const dayDiv = document.createElement('div');
+    dayDiv.className = 'calendar-day inactive';
+    dayDiv.textContent = day;
+    daysContainer.appendChild(dayDiv);
+  }
+  
+  // Current month days
+  for (let day = 1; day <= lastDay.getDate(); day++) {
+    const currentDay = new Date(year, month, day);
+    currentDay.setHours(0, 0, 0, 0);
+    
+    const dayDiv = document.createElement('div');
+    dayDiv.className = 'calendar-day';
+    
+    // Calculate 2-month boundaries
+    const twoMonthsAgo = new Date(today);
+    twoMonthsAgo.setDate(twoMonthsAgo.getDate() - 60);
+    
+    const twoMonthsLater = new Date(today);
+    twoMonthsLater.setDate(twoMonthsLater.getDate() + 60);
+    
+    // Disable if in the past or outside 2-month window
+    if (currentDay < today || currentDay < twoMonthsAgo || currentDay > twoMonthsLater) {
+      dayDiv.classList.add('disabled');
+    } else {
+      const dateStr = formatDateForCalendar(currentDay);
+      if (dateStr === dateChangeSelectedDate) {
+        dayDiv.classList.add('selected');
+      }
+      dayDiv.onclick = function() {
+        selectDateChange(dateStr);
+      };
+    }
+    
+    if (currentDay.getTime() === today.getTime()) {
+      dayDiv.classList.add('today');
+    }
+    
+    dayDiv.textContent = day;
+    daysContainer.appendChild(dayDiv);
+  }
+  
+  // Next month days
+  const remainingDays = 42 - daysContainer.children.length;
+  for (let day = 1; day <= remainingDays; day++) {
+    const dayDiv = document.createElement('div');
+    dayDiv.className = 'calendar-day inactive';
+    dayDiv.textContent = day;
+    daysContainer.appendChild(dayDiv);
+  }
+}
+
+function previousMonthDateChange() {
+  dateChangeCurrentDate.setMonth(dateChangeCurrentDate.getMonth() - 1);
+  renderDateChangeCalendar();
+}
+
+function nextMonthDateChange() {
+  dateChangeCurrentDate.setMonth(dateChangeCurrentDate.getMonth() + 1);
+  renderDateChangeCalendar();
+}
+
+function selectDateChange(dateStr) {
+  // Validate 2-month booking window
+  const selectedDate = new Date(dateStr + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Calculate 2-month boundaries (60 days)
+  const twoMonthsAgo = new Date(today);
+  twoMonthsAgo.setDate(twoMonthsAgo.getDate() - 60);
+  
+  const twoMonthsLater = new Date(today);
+  twoMonthsLater.setDate(twoMonthsLater.getDate() + 60);
+  
+  // Check if selected date is within the 2-month window
+  if (selectedDate < twoMonthsAgo || selectedDate > twoMonthsLater) {
+    // Format dates for error message
+    const formatDate = (date) => {
+      const options = { year: 'numeric', month: 'long', day: 'numeric' };
+      return date.toLocaleDateString('en-US', options);
+    };
+    
+    const errorMessage = `❌ Bookings can only be made within 2 months from today.\n\nYou can book between ${formatDate(twoMonthsAgo)} and ${formatDate(twoMonthsLater)}.`;
+    alert(errorMessage);
+    return;
+  }
+  
+  window.location.href = '/facility/' + facilitySlugForDateChange + '/courts/?date=' + dateStr;
+}
+
+function formatDateForCalendar(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function loadCourtSlots(courtId) {
+  const slotsContainer = document.getElementById('modalSlotsList');
+  slotsContainer.innerHTML = '<div style="text-align:center;padding:2rem;color:#6b7280;grid-column:1/-1;">⏳ Loading available slots...</div>';
+  
+  // Fetch slots for this specific court on the selected date
+  fetch(`/api/facility/${facilityId}/slots/?date=${selectedDate}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.error) {
+        slotsContainer.innerHTML = `<div style="text-align:center;padding:2rem;color:#dc2626;grid-column:1/-1;">${data.error}</div>`;
+        return;
+      }
+      
+      // Find the court in the response
+      const courtData = data.courts.find(c => c.court_id === courtId);
+      
+      if (!courtData) {
+        slotsContainer.innerHTML = '<div style="text-align:center;padding:2rem;color:#6b7280;grid-column:1/-1;">No information available for this court on the selected date.</div>';
+        return;
+      }
+      
+      let slotsHTML = '';
+      
+      // Display restricted slots information (blackout, time restrictions, expired slots)
+      if (courtData.restricted_slots && courtData.restricted_slots.length > 0) {
+        // Separate expired slots from other restricted slots
+        const expiredSlots = courtData.restricted_slots.filter(s => s.reason_type === 'expired');
+        const otherRestrictedSlots = courtData.restricted_slots.filter(s => s.reason_type !== 'expired');
+        
+        // Show expired slots first
+        if (expiredSlots.length > 0) {
+          slotsHTML += `
+            <div style="grid-column:1/-1;background:#f3f4f6;border:1px solid #d1d5db;border-radius:12px;padding:1rem;margin-bottom:1rem;">
+              <div style="display:flex;align-items:flex-start;gap:0.75rem;">
+                <div style="font-size:1.5rem;flex-shrink:0;">⏰</div>
+                <div>
+                  <h4 style="margin:0 0 0.5rem 0;color:#374151;font-size:0.95rem;font-weight:600;">Expired Time Slots</h4>
+                  <p style="margin:0 0 0.75rem 0;color:#6b7280;font-size:0.9rem;">The following time slots have already passed and are no longer available for booking:</p>
+                  <div style="display:grid;gap:0.5rem;">
+          `;
+          
+          expiredSlots.forEach(slot => {
+            slotsHTML += `
+              <div style="background:white;padding:0.75rem;border-radius:8px;border-left:3px solid #9ca3af;opacity:0.6;">
+                <div style="font-weight:600;color:#6b7280;font-size:0.95rem;">${slot.start_time_display} – ${slot.end_time_display}</div>
+                <div style="color:#9ca3af;font-size:0.85rem;margin-top:0.25rem;">⏳ Time slot has already passed</div>
+              </div>
+            `;
+          });
+          
+          slotsHTML += `
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        
+        // Show other restricted slots (blackout, time restrictions)
+        if (otherRestrictedSlots.length > 0) {
+          slotsHTML += `
+            <div style="grid-column:1/-1;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:1rem;margin-bottom:1rem;">
+              <div style="display:flex;align-items:flex-start;gap:0.75rem;">
+                <div style="font-size:1.5rem;flex-shrink:0;">🚫</div>
+                <div>
+                  <h4 style="margin:0 0 0.5rem 0;color:#991b1b;font-size:0.95rem;font-weight:600;">Some Slots Unavailable</h4>
+                  <p style="margin:0 0 0.75rem 0;color:#7f1d1d;font-size:0.9rem;">The following time slots are blocked or restricted:</p>
+                  <div style="display:grid;gap:0.5rem;">
+          `;
+          
+          otherRestrictedSlots.forEach(slot => {
+            slotsHTML += `
+              <div style="background:white;padding:0.75rem;border-radius:8px;border-left:3px solid #dc2626;">
+                <div style="font-weight:600;color:#1f2937;font-size:0.95rem;">${slot.start_time_display} – ${slot.end_time_display}</div>
+                <div style="color:#7f1d1d;font-size:0.85rem;margin-top:0.25rem;">📌 ${slot.reason}</div>
+              </div>
+            `;
+          });
+          
+          slotsHTML += `
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+      
+      // Display available slots
+      if (!courtData.slots || courtData.slots.length === 0) {
+        slotsHTML += '<div style="text-align:center;padding:2rem;color:#6b7280;grid-column:1/-1;">No available slots for this court on the selected date.</div>';
+      } else {
+        slotsHTML += '<div style="grid-column:1/-1;font-size:0.95rem;color:#6b7280;margin-bottom:0.5rem;"><strong>' + courtData.slots.length + ' available slot' + (courtData.slots.length !== 1 ? 's' : '') + '</strong></div>';
+        slotsHTML += courtData.slots.map(slot => `
+          <button class="slot-pill" onclick="bookSlot('${courtId}', '${slot.start_time}', '${slot.end_time}', '${document.getElementById('modalCourtNameHidden').value}')">
+            <div>
+              <div style="font-weight:600;font-size:1rem;color:#1f2937;margin-bottom:0.25rem;">
+                ${slot.start_time_display} – ${slot.end_time_display}
+              </div>
+              <div style="font-size:0.85rem;color:#6b7280;">Click to book</div>
+            </div>
+            <span style="background:#10b981;color:white;padding:0.5rem 1rem;border-radius:8px;font-weight:600;font-size:0.9rem;">Book</span>
+          </button>
+        `).join('');
+      }
+      
+      slotsContainer.innerHTML = slotsHTML;
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      slotsContainer.innerHTML = '<div style="text-align:center;padding:2rem;color:#dc2626;grid-column:1/-1;">Error loading slots. Please try again.</div>';
+    });
+}
+
+function bookSlot(courtId, startTime, endTime, courtName) {
+  if (!confirm(`Book ${courtName}\n${startTime} - ${endTime}\n{{ selected_date|date:"l, F d, Y" }}\n\nConfirm booking?`)) {
+    return;
+  }
+  
+  const bookingData = {
+    facility_id: facilityId,
+    court_id: courtId,
+    booking_date: selectedDate,
+    start_time: startTime,
+    end_time: endTime,
+    notes: ''
+  };
+  
+  fetch('/api/booking/create/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCookie('csrftoken')
+    },
+    body: JSON.stringify(bookingData)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('✅ Booking successful! Redirecting to your profile...');
+      window.location.href = '/profile/';
+    } else {
+      alert('❌ Booking failed: ' + data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('An error occurred while creating the booking.');
+  });
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// Close modals on outside click
+document.getElementById('bookingModal')?.addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeBookingModal();
+  }
+});
+
+document.getElementById('dateChangeModal')?.addEventListener('click', function(e) {
+  if (e.target === this) {
+    closeDateChangeModal();
+  }
+});
+</script>
+{% endblock %}
+
+

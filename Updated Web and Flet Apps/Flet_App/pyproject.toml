@@ -1,0 +1,97 @@
+[project]
+name = "unisports_booking"
+version = "1.0.0"
+description = "Sports Facility Booking App for University Students - Book sports facilities, find nearby locations, and check in with GPS"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Your Name", email = "your@email.com" }
+]
+
+
+dependencies = [
+    "flet>=0.26.0",
+    "requests>=2.31.0",
+    "flet-map>=0.2.0",
+    "flet-geolocator>=0.2.0",
+    "flet-permission-handler>=0.1.0",
+    "qrcode>=7.4.2",
+    "opencv-python>=4.8.0",
+]
+
+
+[tool.flet]
+
+# App identifier (reverse domain notation - must be unique)
+org = "com.unisports"
+
+# Display name shown on device home screen
+product = "UniSports Booking"
+
+# Company name (appears in About dialog)
+company = "University Sports"
+
+# Copyright text
+copyright = "Copyright (C) 2025"
+
+[tool.flet.app]
+# Your main.py and all source code MUST be inside this src folder
+path = "src"
+main = "main.py"
+
+# ============================================================
+# ANDROID BUILD CONFIGURATION
+# ============================================================
+[tool.flet.android]
+# App version code (increment each time you release an update)
+version_code = 1
+
+# Supported CPU architectures (arm64-v8a covers most modern Android devices)
+architectures = ["arm64-v8a", "armeabi-v7a"]
+
+# ============================================================
+# ANDROID PERMISSIONS - REQUIRED FOR SENSORS
+# ============================================================
+# These permissions are automatically added to AndroidManifest.xml
+# during the build process [citation:3]
+
+[tool.flet.android.permissions]
+# Location permissions (GPS)
+"android.permission.ACCESS_FINE_LOCATION" = true
+"android.permission.ACCESS_COARSE_LOCATION" = true
+"android.permission.ACCESS_BACKGROUND_LOCATION" = true
+
+# Camera permission (QR code scanning)
+"android.permission.CAMERA" = true
+
+# Internet (required for API calls and maps)
+"android.permission.INTERNET" = true
+"android.permission.ACCESS_NETWORK_STATE" = true
+
+# Storage permissions (for saving data if needed)
+"android.permission.READ_EXTERNAL_STORAGE" = true
+"android.permission.WRITE_EXTERNAL_STORAGE" = true
+
+# Optional: For Bluetooth-based crowd density features
+"android.permission.BLUETOOTH" = true
+"android.permission.BLUETOOTH_SCAN" = true
+"android.permission.BLUETOOTH_ADVERTISE" = true
+"android.permission.BLUETOOTH_CONNECT" = true
+
+# For proximity sensor and other hardware features
+"android.permission.WAKE_LOCK" = true
+
+# ============================================================
+# WINDOWS BUILD CONFIGURATION (optional - for desktop testing)
+# ============================================================
+[tool.flet.windows]
+product = "UniSports Booking"
+
+# ============================================================
+# IOS BUILD CONFIGURATION (optional - if you need iOS support)
+# ============================================================
+[tool.flet.ios]
+# Info.plist permissions for iOS
+[tool.flet.ios.info_plist]
+NSLocationWhenInUseUsageDescription = "This app needs location access to find nearby sports facilities and enable facility check-in"
+NSCameraUsageDescription = "This app needs camera access to scan QR codes for facility check-in"

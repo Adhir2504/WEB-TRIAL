@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}UniBook · Home{% endblock %}
+
+{% block content %}
+
+<!-- Featured Announcements Banner -->
+<div id="announcementBanners" style="margin-bottom: 2rem;">
+{% if announcements %}
+  {% for announcement in announcements %}
+    {% if announcement.is_featured %}
+      <div class="announcement-banner" style="background: {% if announcement.priority == 'urgent' %}#fee2e2; border-left: 4px solid #dc2626;{% elif announcement.priority == 'high' %}#fef3c7; border-left: 4px solid #f59e0b;{% else %}#dbeafe; border-left: 4px solid #3b82f6;{% endif %} padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; border-radius: 12px; transition: opacity 0.5s ease-out, transform 0.5s ease-out;">
+        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: start;">
+          <div>
+            <strong style="{% if announcement.priority == 'urgent' %}color: #dc2626;{% elif announcement.priority == 'high' %}color: #d97706;{% else %}color: #2563eb;{% endif %}">
+              {% if announcement.priority == 'urgent' %}🔴 URGENT: {% elif announcement.priority == 'high' %}⚠️ IMPORTANT: {% endif %}{{ announcement.title }}
+            </strong>
+            <p style="margin: 0.25rem 0 0 0; {% if announcement.priority == 'urgent' %}color: #7f1d1d;{% elif announcement.priority == 'high' %}color: #92400e;{% else %}color: #1e3a8a;{% endif %}">
+              {{ announcement.content }}
+            </p>
+          </div>
+          <button onclick="this.parentElement.parentElement.style.display='none'" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280; padding: 0; margin-left: 1rem; line-height: 1;">&times;</button>
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+</div>
+
+<!-- Hero / banner -->
+<section class="hero" {% if site_settings.hero_image_url %}style="background-image: linear-gradient(135deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.35) 100%), url('{{ site_settings.hero_image_url }}');"{% endif %}>
+  <div class="hero-content">
+    <p class="hero-tag">WELCOME TO UNIBOOK.</p>
+    <h1>{{ site_settings.hero_title }}</h1>
+    <p class="hero-subtitle">
+      {{ site_settings.hero_subtitle }}
+    </p>
+    <div class="hero-actions">
+        <a href="{% url 'booking_sys:facilities' %}" class="btn btn-primary">Browse Facilities</a>
+        <a href="{% url 'booking_sys:profile' %}" class="btn btn-outline">View My Bookings</a>
+    </div>
+
+  </div>
+  
+</section>
+
+<!-- Overview of facilities / available slots -->
+<section class="section">
+  <div class="section-header">
+    <h2>Top 3 Most Booked This Week</h2>
+    <p>Check out the most popular facilities on campus and quickly book your slot.</p>
+  </div>
+
+  <div class="card-grid">
+    {% if facilities %}
+      {% for facility in facilities %}
+        <article class="facility-card">
+          <div class="facility-image {{ facility.facility_type }}-bg" 
+               {% if facility.image_url %}
+                 style="background-image: url('{{ facility.image_url }}');"
+               {% endif %}>
+            <!-- Badge overlay for status and popularity -->
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem;">
+              {% if forloop.first %}
+                <span class="badge" style="background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #fff;">Most Popular</span>
+              {% else %}
+                <span style="width: 0;"></span>
+              {% endif %}
+              {% if facility.facility_status == 'available' %}
+                <span class="badge" style="background:#16a34a;color:#fff;">Available</span>
+              {% elif facility.facility_status == 'maintenance' %}
+                <span class="badge badge-warning">Limited</span>
+              {% else %}
+                <span class="badge badge-danger">Closed</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="facility-body">
+            <div class="facility-header">
+              <h3>{{ facility.facility_name|upper }}</h3>
+            </div>
+            <p class="facility-meta">@ {{ facility.location }} &bull; {{ facility.get_facility_type_display }}</p>
+            <p class="facility-text">
+              {{ facility.description|default:"No description available."|truncatewords:15 }}
+            </p>
+            <ul class="facility-tags">
+              <li>📊 {{ facility.bookings_this_week }} bookings this week</li>
+              <li>{{ facility.get_facility_type_display }} facility</li>
+              <li>{{ facility.get_facility_status_display }}</li>
+            </ul>
+            <div class="facility-actions">
+                <a href="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}" class="btn btn-outline">View Details</a>
+                {% if facility.facility_status == 'available' %}
+                  <a href="{% url 'booking_sys:facility_detail' facility.facility_name|slugify %}" class="btn btn-primary">Book Now</a>
+                {% endif %}
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+    {% else %}
+      <!-- Default sample facilities if database is empty -->
+      <article class="facility-card">
+        <div class="facility-image futsal-bg">
+          <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-start; padding: 0.75rem;">
+            <span style="width: 0;"></span>
+            <span class="badge" style="background:#16a34a;color:#fff;">Available</span>
+          </div>
+        </div>
+        <div class="facility-body">
+          <div class="facility-header">
+            <h3>FUTSAL</h3>
+          </div>
+          <p class="facility-meta">@ Gymnasium &bull; Sports</p>
+          <p class="facility-text">
+            Indoor synthetic pitch with quality lighting and score display.
+          </p>
+          <ul class="facility-tags">
+            <li>Sports facility</li>
+            <li>Available</li>
+          </ul>
+          <div class="facility-actions">
+              <a href="{% url 'booking_sys:facilities' %}" class="btn btn-outline">View Details</a>
+              <a href="{% url 'booking_sys:facilities' %}" class="btn btn-primary">Book Now</a>
+          </div>
+        </div>
+      </article>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Quick access -->
+<section class="section">
+  <div class="section-header centered">
+    <h2>Quick Access</h2>
+    <p>Essential tools to manage your facility bookings and stay informed.</p>
+  </div>
+
+  <div class="pill-grid">
+    <article class="pill-card">
+      <h3>User Profile</h3>
+      <p>Manage your account, view user preferences and edit your personal information.</p>
+      <a href="{% url 'booking_sys:profile' %}" class="btn btn-soft">Go to Profile</a>
+    </article>
+
+    <article class="pill-card">
+      <h3>Browse Facilities</h3>
+      <p>Explore all available facilities, check schedules and view detailed information.</p>
+      <a href="{% url 'booking_sys:facilities' %}" class="btn btn-soft">See All Facilities</a>
+    </article>
+
+    <article class="pill-card">
+      <h3>Support & Help</h3>
+      <p>Need assistance? Contact support or find answers to frequently asked questions.</p>
+      <a href="{% url 'booking_sys:contact' %}" class="btn btn-soft">Get Help</a>
+    </article>
+  </div>
+</section>
+
+<!-- Updates -->
+<section class="section">
+  <div class="section-header centered">
+    <h2>Updates</h2>
+  </div>
+  <div class="pill-grid">
+    <article class="pill-card">
+      <h3>Operating Hours &amp; Access</h3>
+      <ul class="updates-list">
+        <li>General hours: 8:00 AM – 6:00 PM (Mon – Sat)</li>
+        <li>Staff priority: 12:00 PM – 1:00 PM</li>
+        <li>Reserved exclusively for university staff</li>
+      </ul>
+    </article>
+
+    <article class="pill-card">
+      <h3>Announcements</h3>
+      {% if announcements %}
+        <ul class="updates-list">
+          {% for announcement in announcements %}
+            <li>
+              <strong>{% if announcement.priority == 'urgent' %}🔴 {% elif announcement.priority == 'high' %}⚠️ {% endif %}{{ announcement.title }}</strong>
+              <br><span style="color: var(--text-muted); font-size: 0.9rem;">{{ announcement.content|truncatewords:30 }}</span>
+              {% if announcement.expiry_date %}
+                <br><small style="color: var(--text-muted); font-size: 0.8rem;">Expires: {{ announcement.expiry_date|date:"M d, Y" }}</small>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p style="color: var(--text-muted);">No announcements at this time.</p>
+      {% endif %}
+    </article>
+  </div>
+</section>
+
+<script>
+// Auto-hide announcement banners after 7 seconds
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    const banners = document.querySelectorAll('.announcement-banner');
+    banners.forEach(function(banner) {
+      banner.style.opacity = '0';
+      banner.style.transform = 'translateY(-20px)';
+      setTimeout(function() {
+        banner.style.display = 'none';
+      }, 500); // Wait for fade animation to complete
+    });
+  }, 7000); // 7 seconds
+});
+</script>
+
+{% endblock %}

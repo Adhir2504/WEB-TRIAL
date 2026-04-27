@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}UniBook · Login{% endblock %}
+
+{% block content %}
+<section class="section">
+  <div style="max-width: 400px; margin: 2rem auto;">
+    <div class="card-section">
+      <h1 style="margin-top: 0;">Sign In</h1>
+      <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Welcome back! Please sign in to your account.</p>
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }}" style="padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 8px; background: {% if message.tags == 'error' %}#fee2e2; color: #b91c1c;{% elif message.tags == 'success' %}#d1fae5; color: #065f46;{% else %}#dbeafe; color: #1e40af;{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      <form method="post" action="{% url 'booking_sys:login' %}">
+        {% csrf_token %}
+        
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-control" placeholder="your.email@example.com" required autofocus>
+        
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" required>
+        
+        {% if form.errors %}
+          <div style="margin-top: 1rem; padding: 0.75rem; background: #fee2e2; color: #b91c1c; border-radius: 8px; font-size: 0.9rem;">
+            {% for field, errors in form.errors.items %}
+              {% for error in errors %}
+                <p style="margin: 0;">{{ error }}</p>
+              {% endfor %}
+            {% endfor %}
+          </div>
+        {% endif %}
+        
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">Sign In</button>
+      </form>
+
+      <p style="text-align: center; margin-top: 1.5rem; color: var(--text-muted);">
+        Don't have an account? <a href="{% url 'booking_sys:register' %}" style="color: var(--primary);">Sign up here</a>
+      </p>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
