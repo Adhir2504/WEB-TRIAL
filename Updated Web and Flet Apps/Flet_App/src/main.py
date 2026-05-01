@@ -7,10 +7,11 @@ from views.facility_detail_view import create_facility_detail_view
 from views.booking_view import create_bookings_view
 from views.profile_view import create_profile_view
 from views.register_view import create_register_view
+from views.settings_view import create_settings_view
 from services.auth_service import AuthService
 from services.api_service import ApiService
 from utils.token_storage import TokenStorage
-
+from config import server_config
 
 def main(page: ft.Page):
     page.title = "UniBook Mobile"
@@ -18,6 +19,13 @@ def main(page: ft.Page):
     page.window.height = 780
     page.theme_mode = ft.ThemeMode.LIGHT
     page.padding = 0
+
+    # Check if client_storage is available (it is on web/mobile, not on desktop)
+    if hasattr(page, 'client_storage'):
+        server_config.set_storage(page.client_storage)
+        print("Client storage available - settings will be saved")
+    else:
+        print("Client storage not available - using auto-detection only")
 
     auth_service = AuthService()
     api_service = ApiService()
@@ -52,6 +60,9 @@ def main(page: ft.Page):
         elif page.route == "/profile":
             page.views.append(create_profile_view(page, auth_service))
 
+        elif page.route == "/settings":
+            page.views.append(create_settings_view(page, auth_service, api_service))
+        
         else:
             page.views.append(create_login_view(page, auth_service))
 

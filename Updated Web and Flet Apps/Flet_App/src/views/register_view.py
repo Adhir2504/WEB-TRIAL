@@ -11,11 +11,25 @@ def create_register_view(page, auth_service):
         label="Username",
         prefix_icon=ft.Icons.PERSON,
         border_radius=12,
+        autofill_hints=[ft.AutofillHint.USERNAME],
     )
 
     email = ft.TextField(
         label="Email",
         prefix_icon=ft.Icons.EMAIL,
+        border_radius=12,
+        autofill_hints=[ft.AutofillHint.EMAIL],
+    )
+
+    first_name = ft.TextField(  
+        label="First Name",
+        prefix_icon=ft.Icons.BADGE,
+        border_radius=12,
+    )
+
+    last_name = ft.TextField(  
+        label="Last Name",
+        prefix_icon=ft.Icons.BADGE,
         border_radius=12,
     )
 
@@ -37,27 +51,83 @@ def create_register_view(page, auth_service):
 
     message_text = ft.Text("", color=ft.Colors.RED)
 
+    def validate_email(email_value):
+        """Basic email validation"""
+        return "@" in email_value and "." in email_value.split("@")[-1]
+
     def register_click(e):
-        if not username.value or not email.value or not password.value or not confirm_password.value:
-            message_text.value = "Please fill in all fields."
-            message_text.color = ft.Colors.RED
+        # Clear previous message
+        message_text.value = ""
+        message_text.color = ft.Colors.RED
+        page.update()
+
+        # Validation
+        if not username.value:
+            message_text.value = "Username is required."
             page.update()
             return
 
+        if not email.value or not validate_email(email.value):
+            message_text.value = "Please enter a valid email address."
+            page.update()
+            return
+
+        if not first_name.value:
+            message_text.value = "First name is required."
+            page.update()
+            return
+
+        if not last_name.value:
+            message_text.value = "Last name is required."
+            page.update()
+            return
+
+        if not password.value:
+            message_text.value = "Password is required."
+            page.update()
+            return
+
+        if password.value != confirm_password.value:
+            message_text.value = "Passwords do not match."
+            page.update()
+            return
+
+        if len(password.value) < 6:
+            message_text.value = "Password must be at least 6 characters."
+            page.update()
+            return
+
+        # Show loading state
+        message_text.value = "Creating account..."
+        message_text.color = ft.Colors.BLUE
+        page.update()
+
         result = auth_service.register(
-            username.value,
-            email.value,
-            password.value,
-            confirm_password.value,
+            username=username.value,
+            email=email.value,
+            password=password.value,
+            confirm_password=confirm_password.value,
+            first_name=first_name.value,  # Add first_name
+            last_name=last_name.value,    # Add last_name
+            member_type="student"          # Default member type
         )
 
-        if result.get("token") or result.get("success") or result.get("user"):
-            message_text.value = "Account created successfully. Please sign in."
+        # Check for success
+        if result.get("token") and result.get("user"):
+            # Registration successful and user is auto-logged in
+            message_text.value = "Account created successfully! Redirecting..."
             message_text.color = ft.Colors.GREEN
             page.update()
-            page.go_to("/login")
+            
+            # Small delay to show success message then navigate
+            page.go_to("/home")
+            
+        elif result.get("error"):
+            message_text.value = result.get("error", "Registration failed. Please try again.")
+            message_text.color = ft.Colors.RED
+            page.update()
         else:
-            message_text.value = result.get("error", "Registration failed.")
+            message_text.value = "Registration failed. Please try again."
             message_text.color = ft.Colors.RED
             page.update()
 
@@ -71,6 +141,16 @@ def create_register_view(page, auth_service):
                 icon=ft.Icons.ARROW_BACK,
                 on_click=lambda e: page.go_to("/login"),
             ),
+            actions=[
+                ft.ElevatedButton(
+                    "Configure Server",
+                    icon=ft.Icons.SETTINGS,
+                    bgcolor=ft.Colors.GREY_200,
+                    color=DARK,
+                    width=360,
+                    on_click=lambda e: page.go_to("/settings"),
+                ),
+            ],
         ),
         controls=[
             ft.Container(
@@ -101,8 +181,16 @@ def create_register_view(page, auth_service):
                                     ),
                                     username,
                                     email,
+                                    ft.Row(
+                                        spacing=10,
+                                        controls=[
+                                            ft.Container(expand=True, content=first_name),
+                                            ft.Container(expand=True, content=last_name),
+                                        ],
+                                    ),
                                     password,
                                     confirm_password,
+                                    ft.Container(height=5),
                                     message_text,
                                     ft.ElevatedButton(
                                         "Create Account",

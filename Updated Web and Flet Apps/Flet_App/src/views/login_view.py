@@ -1,6 +1,5 @@
 import flet as ft
 
-
 PRIMARY = "#0F8B83"
 DARK = "#06132A"
 BG = "#F4F6FA"
@@ -29,17 +28,43 @@ def create_login_view(page, auth_service):
             page.update()
             return
 
+        # Show loading indicator
+        error_text.value = "Logging in..."
+        error_text.color = ft.Colors.BLUE
+        page.update()
+
         result = auth_service.login(email.value, password.value)
 
         if result.get("token"):
+            error_text.value = ""
+            page.update()
             page.go_to("/home")
         else:
             error_text.value = result.get("error", "Login failed.")
+            error_text.color = ft.Colors.RED
             page.update()
 
     return ft.View(
         route="/login",
         bgcolor=BG,
+        appbar=ft.AppBar(
+            bgcolor=ft.Colors.WHITE,
+            title=ft.Text("UniBook", color=DARK, weight=ft.FontWeight.BOLD),
+            center_title=True,
+            elevation=0,
+            actions=[
+                ft.IconButton(
+                    icon=ft.Icons.SETTINGS,
+                    icon_size=22,
+                    tooltip="Server Settings",
+                    on_click=lambda e: page.go_to("/settings"),
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.Colors.TRANSPARENT,
+                        overlay_color=ft.Colors.TRANSPARENT,
+                    ),
+                ),
+            ],
+        ),
         controls=[
             ft.Container(
                 expand=True,
@@ -112,6 +137,33 @@ def create_login_view(page, auth_service):
                                                 on_click=lambda e: page.go_to("/register"),
                                             ),
                                         ],
+                                    ),
+                                    
+                                    # Add a simple divider before settings button
+                                    ft.Container(
+                                        height=10,
+                                    ),
+                                    
+                                    # Beautiful centered settings button
+                                    ft.OutlinedButton(
+                                        content=ft.Row(
+                                            spacing=8,
+                                            controls=[
+                                                ft.Icon(ft.Icons.SETTINGS, size=16, color=ft.Colors.GREY_600),
+                                                ft.Text(
+                                                    "Server Settings",
+                                                    size=13,
+                                                    color=ft.Colors.GREY_600,
+                                                ),
+                                            ],
+                                            alignment=ft.MainAxisAlignment.CENTER,
+                                        ),
+                                        style=ft.ButtonStyle(
+                                            side=ft.BorderSide(color=ft.Colors.GREY_300, width=1),
+                                            shape=ft.RoundedRectangleBorder(radius=30),
+                                            padding=ft.padding.symmetric(horizontal=16, vertical=8),
+                                        ),
+                                        on_click=lambda e: page.go_to("/settings"),
                                     ),
                                 ],
                             ),
